@@ -1,0 +1,284 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.chart.LineChart?>
+<?import javafx.scene.chart.NumberAxis?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.ComboBox?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ScrollPane?>
+<?import javafx.scene.control.TableColumn?>
+<?import javafx.scene.control.TableView?>
+<?import javafx.scene.layout.BorderPane?>
+<?import javafx.scene.layout.FlowPane?>
+<?import javafx.scene.layout.GridPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.Region?>
+<?import javafx.scene.layout.StackPane?>
+<?import javafx.scene.layout.VBox?>
+
+<BorderPane xmlns="http://javafx.com/javafx"
+            xmlns:fx="http://javafx.com/fxml"
+            fx:controller="com.example.project_pvasil.VenueController"
+            styleClass="root-pane">
+
+    <!-- ================= TOP BAR ================= -->
+    <top>
+        <HBox spacing="16" styleClass="top-bar">
+            <padding>
+                <Insets top="16" right="24" bottom="16" left="24"/>
+            </padding>
+
+            <Label text="Research Publications App"
+                   styleClass="app-title"/>
+
+            <Region HBox.hgrow="ALWAYS"/>
+
+            <Button text="Back to Home"
+                    onAction="#backToHome"
+                    styleClass="top-back-button"/>
+        </HBox>
+    </top>
+
+    <!-- ================= CONTENT ================= -->
+    <center>
+        <ScrollPane fitToWidth="true"
+                    styleClass="page-scroll">
+            <content>
+                <StackPane>
+                    <padding>
+                        <Insets top="28" right="42" bottom="42" left="42"/>
+                    </padding>
+
+                    <VBox spacing="22"
+                          maxWidth="1180">
+
+                        <!-- Hero -->
+                        <VBox spacing="8"
+                              styleClass="venue-hero-card">
+
+                            <Label text="Journals / Conferences"
+                                   styleClass="venue-hero-title"/>
+
+                            <Label text="Select a journal or conference to view its ranking, yearly statistics, author activity, and article report."
+                                   styleClass="venue-hero-subtitle"
+                                   wrapText="true"/>
+                        </VBox>
+
+                        <!-- Filters -->
+                        <VBox spacing="12"
+                              styleClass="filter-card">
+
+                            <HBox spacing="12">
+                                <VBox spacing="4" HBox.hgrow="ALWAYS">
+                                    <Label text="Search Filters"
+                                           styleClass="content-title"/>
+
+                                    <Label text="Choose the venue type, select a venue, and optionally restrict the results to a year range."
+                                           styleClass="stat-muted"
+                                           wrapText="true"/>
+                                </VBox>
+                            </HBox>
+
+                            <FlowPane hgap="12" vgap="12">
+
+                                <ComboBox fx:id="venueTypeComboBox"
+                                          promptText="Journal / Conference"
+                                          prefWidth="200"/>
+
+                                <ComboBox fx:id="venueComboBox"
+                                          promptText="Select venue"
+                                          prefWidth="360"/>
+
+                                <ComboBox fx:id="fromYearComboBox"
+                                          promptText="From year"
+                                          prefWidth="130"/>
+
+                                <ComboBox fx:id="toYearComboBox"
+                                          promptText="To year"
+                                          prefWidth="130"/>
+
+                                <Button text="Load Profile"
+                                        styleClass="primary-button"/>
+
+                                <Button text="Clear"
+                                        styleClass="secondary-button"/>
+
+                            </FlowPane>
+                        </VBox>
+
+                        <!-- Ranking + Statistics -->
+                        <HBox spacing="20">
+
+                            <!-- Ranking -->
+                            <VBox spacing="14"
+                                  styleClass="ranking-card"
+                                  prefWidth="340"
+                                  minWidth="320">
+
+                                <Label text="Ranking"
+                                       styleClass="ranking-title"/>
+
+                                <VBox spacing="3">
+                                    <Label text="Rank / Quartile"
+                                           styleClass="ranking-label"/>
+
+                                    <Label fx:id="rankingLabel"
+                                           text="-"
+                                           styleClass="ranking-value"/>
+                                </VBox>
+
+                                <VBox spacing="3">
+                                    <Label text="Category"
+                                           styleClass="ranking-label"/>
+
+                                    <Label fx:id="categoryLabel"
+                                           text="-"
+                                           styleClass="ranking-value"/>
+                                </VBox>
+
+                                <VBox spacing="3">
+                                    <Label text="Ranking metrics"
+                                           styleClass="ranking-label"/>
+
+                                    <Label fx:id="rankingMetricsLabel"
+                                           text="-"
+                                           styleClass="ranking-muted"
+                                           wrapText="true"/>
+                                </VBox>
+                            </VBox>
+
+                            <!-- Statistics -->
+                            <VBox spacing="14"
+                                  styleClass="stats-panel"
+                                  HBox.hgrow="ALWAYS">
+
+                                <Label text="Profile Statistics"
+                                       styleClass="content-title"/>
+
+                                <GridPane hgap="14" vgap="14">
+
+                                    <VBox spacing="4"
+                                          styleClass="metric-card"
+                                          GridPane.rowIndex="0"
+                                          GridPane.columnIndex="0">
+                                        <Label text="First year" styleClass="metric-label"/>
+                                        <Label fx:id="firstYearLabel" text="-" styleClass="metric-value"/>
+                                    </VBox>
+
+                                    <VBox spacing="4"
+                                          styleClass="metric-card"
+                                          GridPane.rowIndex="0"
+                                          GridPane.columnIndex="1">
+                                        <Label text="Last year" styleClass="metric-label"/>
+                                        <Label fx:id="lastYearLabel" text="-" styleClass="metric-value"/>
+                                    </VBox>
+
+                                    <VBox spacing="4"
+                                          styleClass="metric-card"
+                                          GridPane.rowIndex="0"
+                                          GridPane.columnIndex="2">
+                                        <Label text="Total articles" styleClass="metric-label"/>
+                                        <Label fx:id="totalArticlesLabel" text="-" styleClass="metric-value"/>
+                                    </VBox>
+
+                                    <VBox spacing="4"
+                                          styleClass="metric-card"
+                                          GridPane.rowIndex="1"
+                                          GridPane.columnIndex="0">
+                                        <Label text="Author entries" styleClass="metric-label"/>
+                                        <Label fx:id="totalAuthorsLabel" text="-" styleClass="metric-value"/>
+                                    </VBox>
+
+                                    <VBox spacing="4"
+                                          styleClass="metric-card"
+                                          GridPane.rowIndex="1"
+                                          GridPane.columnIndex="1">
+                                        <Label text="Distinct authors" styleClass="metric-label"/>
+                                        <Label fx:id="distinctAuthorsLabel" text="-" styleClass="metric-value"/>
+                                    </VBox>
+
+                                    <VBox spacing="4"
+                                          styleClass="metric-card"
+                                          GridPane.rowIndex="1"
+                                          GridPane.columnIndex="2">
+                                        <Label text="Avg authors / article" styleClass="metric-label"/>
+                                        <Label fx:id="avgAuthorsArticleLabel" text="-" styleClass="metric-value"/>
+                                    </VBox>
+
+                                </GridPane>
+                            </VBox>
+
+                        </HBox>
+
+                        <!-- Chart -->
+                        <VBox spacing="12"
+                              styleClass="dashboard-panel">
+
+                            <VBox spacing="4">
+                                <Label text="Yearly Statistics"
+                                       styleClass="content-title"/>
+
+                                <Label text="Line chart for articles, total author entries, and distinct authors per year."
+                                       styleClass="stat-muted"
+                                       wrapText="true"/>
+                            </VBox>
+
+                            <LineChart fx:id="yearlyLineChart"
+                                       title="Yearly venue statistics"
+                                       prefHeight="300">
+                                <xAxis>
+                                    <NumberAxis label="Year"/>
+                                </xAxis>
+                                <yAxis>
+                                    <NumberAxis label="Count"/>
+                                </yAxis>
+                            </LineChart>
+                        </VBox>
+
+                        <!-- Article Report -->
+                        <VBox spacing="12"
+                              styleClass="dashboard-panel">
+
+                            <VBox spacing="4">
+                                <Label text="Article Report"
+                                       styleClass="content-title"/>
+
+                                <Label text="All articles for the selected journal or conference. If a year range is selected, only articles within that range will be displayed."
+                                       styleClass="stat-muted"
+                                       wrapText="true"/>
+                            </VBox>
+
+                            <TableView fx:id="articlesTable"
+                                       prefHeight="280">
+                                <columns>
+                                    <TableColumn fx:id="yearColumn"
+                                                 text="Year"
+                                                 prefWidth="80"/>
+
+                                    <TableColumn fx:id="titleColumn"
+                                                 text="Title"
+                                                 prefWidth="430"/>
+
+                                    <TableColumn fx:id="authorsColumn"
+                                                 text="Authors"
+                                                 prefWidth="330"/>
+
+                                    <TableColumn fx:id="pagesColumn"
+                                                 text="Pages"
+                                                 prefWidth="100"/>
+
+                                    <TableColumn fx:id="urlColumn"
+                                                 text="URL / EE"
+                                                 prefWidth="180"/>
+                                </columns>
+                            </TableView>
+                        </VBox>
+
+                    </VBox>
+                </StackPane>
+            </content>
+        </ScrollPane>
+    </center>
+
+</BorderPane>
