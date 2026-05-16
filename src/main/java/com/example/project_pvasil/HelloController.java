@@ -7,27 +7,35 @@ import javafx.scene.Node;
 import javafx.scene.Parent;
 
 import java.io.IOException;
+import java.net.URL;
 import java.util.Objects;
 
 public class HelloController {
 
     @FXML
     private void openVenuePage(ActionEvent event) {
-        switchPage(event, "venue-view.fxml");
+        switchPage(event, "/com/example/project_pvasil/venue-view.fxml");
     }
 
-    private void switchPage(ActionEvent event, String fxmlFile) {
+    @FXML
+    private void openYearsPage(ActionEvent event) {
+        switchPage(event, "/com/example/project_pvasil/year-view.fxml");
+    }
+
+    private void switchPage(ActionEvent event, String fxmlPath) {
         try {
-            Parent root = FXMLLoader.load(
-                    Objects.requireNonNull(
-                            getClass().getResource(fxmlFile),
-                            "Cannot find " + fxmlFile
-                    )
+            URL fxmlUrl = Objects.requireNonNull(
+                    getClass().getResource(fxmlPath),
+                    "Cannot find FXML file: " + fxmlPath
             );
+
+            Parent root = FXMLLoader.load(fxmlUrl);
 
             ((Node) event.getSource()).getScene().setRoot(root);
 
         } catch (IOException exception) {
+            exception.printStackTrace();
+        } catch (RuntimeException exception) {
             exception.printStackTrace();
         }
     }

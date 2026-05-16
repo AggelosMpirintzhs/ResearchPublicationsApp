@@ -1,5 +1,6 @@
 package com.example.project_pvasil;
 
+import db.DatabaseManager;
 import javafx.application.Application;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Scene;
@@ -12,6 +13,8 @@ public class HelloApplication extends Application {
 
     @Override
     public void start(Stage stage) throws Exception {
+        DatabaseManager.initialize();
+
         URL fxmlUrl = Objects.requireNonNull(
                 HelloApplication.class.getResource("hello-view.fxml"),
                 "Cannot find hello-view.fxml"
@@ -34,7 +37,12 @@ public class HelloApplication extends Application {
         stage.show();
     }
 
+    @Override
+    public void stop() {
+        DatabaseManager.shutdown();
+    }
+
     public static void main(String[] args) {
-        launch();
+        launch(args);
     }
 }

@@ -82,8 +82,8 @@
             <Label text="Explore a selected year, including total publications, distinct journals, distinct conferences, distinct authors, and filtered reports."
                    styleClass="card-description"/>
 
-            <Button text="Coming Soon"
-                    disable="true"
+            <Button text="Open Section"
+                    onAction="#openYearsPage"
                     styleClass="nav-button"/>
           </VBox>
 
