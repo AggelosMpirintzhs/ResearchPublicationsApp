@@ -155,6 +155,40 @@ public class JournalRepository {
         }
     }
 
+    public List<JournalArticleDto> findJournalArticlesBatch(
+            int journalId,
+            int startYear,
+            int endYear,
+            int lastArticleId,
+            int batchSize
+    ) {
+        String sql = SqlFileLoader.load("sql/journal/journal_articles_report_batch.sql");
+
+        try (
+                Connection connection = DatabaseManager.getConnection();
+                PreparedStatement statement = connection.prepareStatement(sql)
+        ) {
+            statement.setInt(1, journalId);
+            statement.setInt(2, startYear);
+            statement.setInt(3, endYear);
+            statement.setInt(4, lastArticleId);
+            statement.setInt(5, batchSize);
+
+            try (ResultSet rs = statement.executeQuery()) {
+                List<JournalArticleDto> results = new ArrayList<>();
+
+                while (rs.next()) {
+                    results.add(mapJournalArticle(rs));
+                }
+
+                return results;
+            }
+
+        } catch (SQLException exception) {
+            throw new RuntimeException("Αποτυχία φόρτωσης batch άρθρων περιοδικού.", exception);
+        }
+    }
+
     private JournalSearchResultDto mapJournalSearchResult(ResultSet rs) throws SQLException {
         return new JournalSearchResultDto(
                 getInteger(rs, "journal_id"),

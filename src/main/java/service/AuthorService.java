@@ -15,8 +15,13 @@ public class AuthorService {
     private static final int DEFAULT_START_YEAR = 0;
     private static final int DEFAULT_END_YEAR = 9999;
 
+    private static final int MIN_SEARCH_LENGTH = 3;
     private static final int DEFAULT_SEARCH_LIMIT = 20;
-    private static final int MAX_SEARCH_LIMIT = 100;
+    private static final int MAX_SEARCH_LIMIT = 50;
+
+    private static final int DEFAULT_LAST_ARTICLE_ID = 0;
+    private static final int DEFAULT_BATCH_SIZE = 1000;
+    private static final int MAX_BATCH_SIZE = 5000;
 
     private final AuthorRepository authorRepository;
 
@@ -27,11 +32,11 @@ public class AuthorService {
     public List<AuthorSearchResultDto> searchAuthors(String searchText, Integer limit) {
         String normalizedSearchText = normalizeSearchText(searchText);
 
-        if (normalizedSearchText.isEmpty()) {
+        if (normalizedSearchText.length() < MIN_SEARCH_LENGTH) {
             return List.of();
         }
 
-        int safeLimit = normalizeLimit(limit);
+        int safeLimit = normalizeSearchLimit(limit);
 
         return authorRepository.searchAuthors(normalizedSearchText, safeLimit);
     }
@@ -84,19 +89,26 @@ public class AuthorService {
         );
     }
 
-    public List<AuthorPublicationDto> getAuthorPublications(
+    public List<AuthorPublicationDto> getAuthorPublicationsBatch(
             int authorId,
             Integer startYear,
-            Integer endYear
+            Integer endYear,
+            Integer lastArticleId,
+            Integer batchSize
     ) {
         validateId(authorId, "authorId");
 
         YearRange yearRange = normalizeYearRange(startYear, endYear);
 
-        return authorRepository.findAuthorPublications(
+        int safeLastArticleId = normalizeLastArticleId(lastArticleId);
+        int safeBatchSize = normalizeBatchSize(batchSize);
+
+        return authorRepository.findAuthorPublicationsBatch(
                 authorId,
                 yearRange.startYear(),
-                yearRange.endYear()
+                yearRange.endYear(),
+                safeLastArticleId,
+                safeBatchSize
         );
     }
 
@@ -105,10 +117,14 @@ public class AuthorService {
             return "";
         }
 
-        return searchText.trim();
+        return searchText
+                .toLowerCase()
+                .trim()
+                .replaceAll("[^\\p{L}\\p{Nd}]+", " ")
+                .replaceAll("\\s+", " ");
     }
 
-    private int normalizeLimit(Integer limit) {
+    private int normalizeSearchLimit(Integer limit) {
         if (limit == null || limit <= 0) {
             return DEFAULT_SEARCH_LIMIT;
         }
@@ -125,6 +141,26 @@ public class AuthorService {
         }
 
         return new YearRange(safeStartYear, safeEndYear);
+    }
+
+    private int normalizeLastArticleId(Integer lastArticleId) {
+        if (lastArticleId == null) {
+            return DEFAULT_LAST_ARTICLE_ID;
+        }
+
+        if (lastArticleId < 0) {
+            throw new IllegalArgumentException("Το lastArticleId δεν μπορεί να είναι αρνητικό.");
+        }
+
+        return lastArticleId;
+    }
+
+    private int normalizeBatchSize(Integer batchSize) {
+        if (batchSize == null || batchSize <= 0) {
+            return DEFAULT_BATCH_SIZE;
+        }
+
+        return Math.min(batchSize, MAX_BATCH_SIZE);
     }
 
     private void validateId(int id, String fieldName) {

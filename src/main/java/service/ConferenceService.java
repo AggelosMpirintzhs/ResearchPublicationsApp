@@ -18,6 +18,10 @@ public class ConferenceService {
     private static final int DEFAULT_SEARCH_LIMIT = 20;
     private static final int MAX_SEARCH_LIMIT = 100;
 
+    private static final int DEFAULT_LAST_ARTICLE_ID = 0;
+    private static final int DEFAULT_BATCH_SIZE = 1000;
+    private static final int MAX_BATCH_SIZE = 5000;
+
     private final ConferenceRepository conferenceRepository;
 
     public ConferenceService() {
@@ -90,6 +94,29 @@ public class ConferenceService {
         );
     }
 
+    public List<ConferenceArticleDto> getConferenceArticlesBatch(
+            int conferenceId,
+            Integer startYear,
+            Integer endYear,
+            Integer lastArticleId,
+            Integer batchSize
+    ) {
+        validateId(conferenceId, "conferenceId");
+
+        YearRange yearRange = normalizeYearRange(startYear, endYear);
+
+        int safeLastArticleId = normalizeLastArticleId(lastArticleId);
+        int safeBatchSize = normalizeBatchSize(batchSize);
+
+        return conferenceRepository.findConferenceArticlesBatch(
+                conferenceId,
+                yearRange.startYear(),
+                yearRange.endYear(),
+                safeLastArticleId,
+                safeBatchSize
+        );
+    }
+
     private String normalizeSearchText(String searchText) {
         if (searchText == null) {
             return "";
@@ -115,6 +142,26 @@ public class ConferenceService {
         }
 
         return new YearRange(safeStartYear, safeEndYear);
+    }
+
+    private int normalizeLastArticleId(Integer lastArticleId) {
+        if (lastArticleId == null) {
+            return DEFAULT_LAST_ARTICLE_ID;
+        }
+
+        if (lastArticleId < 0) {
+            throw new IllegalArgumentException("Το lastArticleId δεν μπορεί να είναι αρνητικό.");
+        }
+
+        return lastArticleId;
+    }
+
+    private int normalizeBatchSize(Integer batchSize) {
+        if (batchSize == null || batchSize <= 0) {
+            return DEFAULT_BATCH_SIZE;
+        }
+
+        return Math.min(batchSize, MAX_BATCH_SIZE);
     }
 
     private void validateId(int id, String fieldName) {

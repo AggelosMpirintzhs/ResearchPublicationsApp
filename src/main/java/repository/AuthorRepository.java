@@ -21,12 +21,23 @@ public class AuthorRepository {
     public List<AuthorSearchResultDto> searchAuthors(String searchText, int limit) {
         String sql = SqlFileLoader.load("sql/author/search_authors.sql");
 
+        String prefixPattern = buildPrefixPattern(searchText);
+        String wordStartPattern = buildWordStartPattern(searchText);
+        String containsPattern = buildContainsPattern(searchText);
+
         try (
                 Connection connection = DatabaseManager.getConnection();
                 PreparedStatement statement = connection.prepareStatement(sql)
         ) {
-            statement.setString(1, searchText);
-            statement.setInt(2, limit);
+            statement.setString(1, prefixPattern);
+            statement.setString(2, wordStartPattern);
+            statement.setString(3, containsPattern);
+
+            statement.setString(4, prefixPattern);
+            statement.setString(5, wordStartPattern);
+            statement.setString(6, containsPattern);
+
+            statement.setInt(7, limit);
 
             try (ResultSet rs = statement.executeQuery()) {
                 List<AuthorSearchResultDto> results = new ArrayList<>();
@@ -42,6 +53,30 @@ public class AuthorRepository {
             throw new RuntimeException("Αποτυχία αναζήτησης συγγραφέων.", exception);
         }
     }
+
+    private String buildPrefixPattern(String searchText) {
+        return buildTokenPattern(searchText) + "%";
+    }
+
+    private String buildWordStartPattern(String searchText) {
+        return "% " + buildTokenPattern(searchText) + "%";
+    }
+
+    private String buildContainsPattern(String searchText) {
+        return "%" + buildTokenPattern(searchText) + "%";
+    }
+
+    private String buildTokenPattern(String searchText) {
+        if (searchText == null || searchText.isBlank()) {
+            return "";
+        }
+
+        return searchText
+                .trim()
+                .replaceAll("\\s+", "%");
+    }
+
+
 
     public Optional<AuthorProfileDto> findAuthorProfile(
             int authorId,
@@ -76,7 +111,7 @@ public class AuthorRepository {
             int startYear,
             int endYear
     ) {
-        String sql = SqlFileLoader.load("sql/author/author_yearly_linechart.sql");
+        String sql = SqlFileLoader.load("sql/author/author_yearly_stats.sql");
 
         try (
                 Connection connection = DatabaseManager.getConnection();
@@ -106,7 +141,7 @@ public class AuthorRepository {
             int startYear,
             int endYear
     ) {
-        String sql = SqlFileLoader.load("sql/author/author_yearly_linechart_by_type.sql");
+        String sql = SqlFileLoader.load("sql/author/author_yearly_stats_by_type.sql");
 
         try (
                 Connection connection = DatabaseManager.getConnection();
@@ -127,16 +162,18 @@ public class AuthorRepository {
             }
 
         } catch (SQLException exception) {
-            throw new RuntimeException("Αποτυχία φόρτωσης yearly stats συγγραφέα ανά τύπο.", exception);
+            throw new RuntimeException("Αποτυχία φόρτωσης yearly stats ανά τύπο συγγραφέα.", exception);
         }
     }
 
-    public List<AuthorPublicationDto> findAuthorPublications(
+    public List<AuthorPublicationDto> findAuthorPublicationsBatch(
             int authorId,
             int startYear,
-            int endYear
+            int endYear,
+            int lastArticleId,
+            int batchSize
     ) {
-        String sql = SqlFileLoader.load("sql/author/author_publications_report.sql");
+        String sql = SqlFileLoader.load("sql/author/author_publications_report_batch.sql");
 
         try (
                 Connection connection = DatabaseManager.getConnection();
@@ -145,6 +182,8 @@ public class AuthorRepository {
             statement.setInt(1, authorId);
             statement.setInt(2, startYear);
             statement.setInt(3, endYear);
+            statement.setInt(4, lastArticleId);
+            statement.setInt(5, batchSize);
 
             try (ResultSet rs = statement.executeQuery()) {
                 List<AuthorPublicationDto> results = new ArrayList<>();
@@ -157,7 +196,7 @@ public class AuthorRepository {
             }
 
         } catch (SQLException exception) {
-            throw new RuntimeException("Αποτυχία φόρτωσης δημοσιεύσεων συγγραφέα.", exception);
+            throw new RuntimeException("Αποτυχία φόρτωσης batch δημοσιεύσεων συγγραφέα.", exception);
         }
     }
 

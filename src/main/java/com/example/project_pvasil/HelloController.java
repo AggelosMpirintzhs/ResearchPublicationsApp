@@ -22,6 +22,16 @@ public class HelloController {
         switchPage(event, "/com/example/project_pvasil/year-view.fxml");
     }
 
+    @FXML
+    private void openAuthorPage(ActionEvent event) {
+        switchPage(event, "/com/example/project_pvasil/author-view.fxml");
+    }
+
+    @FXML
+    private void openChartsPage(ActionEvent event) {
+        switchPage(event, "/com/example/project_pvasil/charts-view.fxml");
+    }
+
     private void switchPage(ActionEvent event, String fxmlPath) {
         try {
             URL fxmlUrl = Objects.requireNonNull(

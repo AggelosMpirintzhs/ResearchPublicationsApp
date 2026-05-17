@@ -22,13 +22,18 @@
 
     <!-- ================= TOP BAR ================= -->
     <top>
-        <HBox spacing="16" styleClass="top-bar">
+        <HBox spacing="16" alignment="CENTER_LEFT" styleClass="top-bar">
             <padding>
-                <Insets top="16" right="24" bottom="16" left="24"/>
+                <Insets top="16" right="26" bottom="16" left="26"/>
             </padding>
 
-            <Label text="Research Publications App"
-                   styleClass="app-title"/>
+            <VBox spacing="2">
+                <Label text="Research Publications App"
+                       styleClass="app-title"/>
+
+                <Label text="Year profile dashboard"
+                       styleClass="app-subtitle"/>
+            </VBox>
 
             <Region HBox.hgrow="ALWAYS"/>
 
@@ -42,33 +47,46 @@
     <!-- ================= CONTENT ================= -->
     <center>
         <ScrollPane fitToWidth="true"
+                    fitToHeight="false"
+                    hbarPolicy="NEVER"
+                    pannable="true"
                     styleClass="page-scroll">
             <content>
-                <StackPane>
+                <StackPane alignment="TOP_CENTER">
                     <padding>
-                        <Insets top="28" right="42" bottom="42" left="42"/>
+                        <Insets top="28" right="42" bottom="44" left="42"/>
                     </padding>
 
                     <VBox spacing="22"
-                          maxWidth="1180">
+                          alignment="TOP_CENTER"
+                          maxWidth="1200">
 
-                        <!-- Hero -->
-                        <VBox spacing="8"
+                        <!-- ================= HERO ================= -->
+                        <VBox spacing="10"
+                              maxWidth="Infinity"
                               styleClass="venue-hero-card">
 
-                            <Label text="Years"
-                                   styleClass="venue-hero-title"/>
+                            <HBox alignment="CENTER_LEFT" spacing="14">
+                                <VBox spacing="6" HBox.hgrow="ALWAYS">
+                                    <Label text="Years"
+                                           styleClass="venue-hero-title"/>
 
-                            <Label text="Select a year to view publication statistics, distinct journals, distinct conferences, author activity, and optionally the related publication report."
-                                   styleClass="venue-hero-subtitle"
-                                   wrapText="true"/>
+                                    <Label text="Select a year to view publication statistics, distinct journals, distinct conferences, author activity, and optionally the related publication report."
+                                           styleClass="venue-hero-subtitle"
+                                           wrapText="true"/>
+                                </VBox>
+
+                                <Label text="YEAR PROFILE"
+                                       styleClass="hero-chip"/>
+                            </HBox>
                         </VBox>
 
-                        <!-- Filters -->
-                        <VBox spacing="14"
+                        <!-- ================= FILTERS ================= -->
+                        <VBox spacing="16"
+                              maxWidth="1200"
                               styleClass="filter-card">
 
-                            <VBox spacing="4">
+                            <VBox spacing="5">
                                 <Label text="Year Filters"
                                        styleClass="content-title"/>
 
@@ -77,22 +95,25 @@
                                        wrapText="true"/>
                             </VBox>
 
-                            <HBox spacing="12">
+                            <HBox spacing="12" alignment="CENTER_LEFT" styleClass="form-row">
                                 <ComboBox fx:id="yearComboBox"
                                           promptText="Select year"
-                                          prefWidth="180"/>
+                                          prefWidth="180"
+                                          styleClass="form-control"/>
 
                                 <ComboBox fx:id="publicationTypeComboBox"
                                           promptText="Publication type"
-                                          prefWidth="180"/>
+                                          prefWidth="180"
+                                          styleClass="form-control"/>
 
-                                <HBox spacing="6">
-                                    <CheckBox fx:id="loadPublicationsCheckBox"
-                                              selected="false"/>
-
-                                    <Label text="Load publications"
-                                           style="-fx-text-fill: #1f2937; -fx-font-size: 13px;"/>
-                                </HBox>
+                                <CheckBox fx:id="loadPublicationsCheckBox"
+                                          text="Load publications"
+                                          selected="false"
+                                          prefWidth="185"
+                                          minWidth="185"
+                                          minHeight="38"
+                                          alignment="CENTER_LEFT"
+                                          styleClass="load-articles-toggle"/>
 
                                 <Button fx:id="loadYearButton"
                                         text="Load Year Profile"
@@ -110,93 +131,74 @@
                                         styleClass="secondary-button"/>
                             </HBox>
 
-                            <HBox spacing="8">
-                                <Label text="Selected:"
-                                       styleClass="metric-label"/>
+                            <HBox spacing="10" alignment="CENTER_LEFT" styleClass="selected-strip">
+                                <Label text="Selected"
+                                       styleClass="selected-label"/>
 
                                 <Label fx:id="selectedYearLabel"
                                        text="No year selected"
-                                       style="-fx-text-fill: #1f2937; -fx-font-weight: 600;"/>
+                                       styleClass="selected-value"/>
                             </HBox>
                         </VBox>
 
-                        <!-- Year Profile Statistics -->
-                        <VBox spacing="14"
+                        <!-- ================= YEAR PROFILE STATISTICS ================= -->
+                        <VBox spacing="16"
+                              maxWidth="1200"
                               styleClass="stats-panel">
 
-                            <Label text="Year Profile Statistics"
-                                   styleClass="content-title"/>
+                            <HBox alignment="CENTER_LEFT">
+                                <Label text="Year Profile Statistics"
+                                       styleClass="content-title"/>
+
+                                <Region HBox.hgrow="ALWAYS"/>
+
+                                <Label text="SUMMARY"
+                                       styleClass="small-blue-chip"/>
+                            </HBox>
 
                             <GridPane hgap="14" vgap="14">
 
-                                <VBox spacing="4"
-                                      styleClass="metric-card"
-                                      GridPane.rowIndex="0"
-                                      GridPane.columnIndex="0">
+                                <VBox spacing="5" styleClass="metric-card" GridPane.rowIndex="0" GridPane.columnIndex="0">
                                     <Label text="Year" styleClass="metric-label"/>
                                     <Label fx:id="yearLabel" text="-" styleClass="metric-value"/>
                                 </VBox>
 
-                                <VBox spacing="4"
-                                      styleClass="metric-card"
-                                      GridPane.rowIndex="0"
-                                      GridPane.columnIndex="1">
+                                <VBox spacing="5" styleClass="metric-card" GridPane.rowIndex="0" GridPane.columnIndex="1">
                                     <Label text="Total articles" styleClass="metric-label"/>
                                     <Label fx:id="totalArticlesLabel" text="-" styleClass="metric-value"/>
                                 </VBox>
 
-                                <VBox spacing="4"
-                                      styleClass="metric-card"
-                                      GridPane.rowIndex="0"
-                                      GridPane.columnIndex="2">
+                                <VBox spacing="5" styleClass="metric-card" GridPane.rowIndex="0" GridPane.columnIndex="2">
                                     <Label text="Journal articles" styleClass="metric-label"/>
                                     <Label fx:id="totalJournalArticlesLabel" text="-" styleClass="metric-value"/>
                                 </VBox>
 
-                                <VBox spacing="4"
-                                      styleClass="metric-card"
-                                      GridPane.rowIndex="0"
-                                      GridPane.columnIndex="3">
+                                <VBox spacing="5" styleClass="metric-card" GridPane.rowIndex="0" GridPane.columnIndex="3">
                                     <Label text="Conference articles" styleClass="metric-label"/>
                                     <Label fx:id="totalConferenceArticlesLabel" text="-" styleClass="metric-value"/>
                                 </VBox>
 
-                                <VBox spacing="4"
-                                      styleClass="metric-card"
-                                      GridPane.rowIndex="1"
-                                      GridPane.columnIndex="0">
+                                <VBox spacing="5" styleClass="metric-card" GridPane.rowIndex="1" GridPane.columnIndex="0">
                                     <Label text="Distinct journals" styleClass="metric-label"/>
                                     <Label fx:id="distinctJournalsLabel" text="-" styleClass="metric-value"/>
                                 </VBox>
 
-                                <VBox spacing="4"
-                                      styleClass="metric-card"
-                                      GridPane.rowIndex="1"
-                                      GridPane.columnIndex="1">
+                                <VBox spacing="5" styleClass="metric-card" GridPane.rowIndex="1" GridPane.columnIndex="1">
                                     <Label text="Distinct conferences" styleClass="metric-label"/>
                                     <Label fx:id="distinctConferencesLabel" text="-" styleClass="metric-value"/>
                                 </VBox>
 
-                                <VBox spacing="4"
-                                      styleClass="metric-card"
-                                      GridPane.rowIndex="1"
-                                      GridPane.columnIndex="2">
+                                <VBox spacing="5" styleClass="metric-card" GridPane.rowIndex="1" GridPane.columnIndex="2">
                                     <Label text="Author entries" styleClass="metric-label"/>
                                     <Label fx:id="totalAuthorOccurrencesLabel" text="-" styleClass="metric-value"/>
                                 </VBox>
 
-                                <VBox spacing="4"
-                                      styleClass="metric-card"
-                                      GridPane.rowIndex="1"
-                                      GridPane.columnIndex="3">
+                                <VBox spacing="5" styleClass="metric-card" GridPane.rowIndex="1" GridPane.columnIndex="3">
                                     <Label text="Distinct authors" styleClass="metric-label"/>
                                     <Label fx:id="distinctAuthorsLabel" text="-" styleClass="metric-value"/>
                                 </VBox>
 
-                                <VBox spacing="4"
-                                      styleClass="metric-card"
-                                      GridPane.rowIndex="2"
-                                      GridPane.columnIndex="0">
+                                <VBox spacing="5" styleClass="metric-card" GridPane.rowIndex="2" GridPane.columnIndex="0">
                                     <Label text="Avg authors / article" styleClass="metric-label"/>
                                     <Label fx:id="avgAuthorsPerArticleLabel" text="-" styleClass="metric-value"/>
                                 </VBox>
@@ -204,50 +206,45 @@
                             </GridPane>
                         </VBox>
 
-                        <!-- Publication Report -->
+                        <!-- ================= PUBLICATION REPORT ================= -->
                         <VBox fx:id="publicationReportPanel"
                               spacing="12"
-                              styleClass="dashboard-panel">
+                              maxWidth="1200"
+                              styleClass="dashboard-panel article-report-panel">
 
-                            <VBox spacing="4">
-                                <Label text="Publication Report"
-                                       styleClass="content-title"/>
+                            <HBox alignment="CENTER_LEFT" spacing="12">
+                                <VBox spacing="4" HBox.hgrow="ALWAYS">
+                                    <Label text="Publication Report"
+                                           styleClass="content-title"/>
 
-                                <Label text="Publications are loaded only when the Load publications option is selected."
-                                       styleClass="stat-muted"
-                                       wrapText="true"/>
-                            </VBox>
+                                    <Label text="Publications are loaded only when the Load publications option is selected. Results are shown in a fixed-height scrollable table."
+                                           styleClass="stat-muted"
+                                           wrapText="true"/>
+                                </VBox>
+
+                                <Label fx:id="articlesLoadedLabel"
+                                       text="Articles Loaded: 0 / 0"
+                                       style="-fx-text-fill: #0f4c81; -fx-font-weight: 700; -fx-font-size: 13px;"/>
+
+                                <Label text="SCROLL TABLE"
+                                       styleClass="small-blue-chip"/>
+                            </HBox>
 
                             <TableView fx:id="publicationsTable"
-                                       prefHeight="330">
+                                       prefHeight="350"
+                                       minHeight="350"
+                                       maxHeight="350"
+                                       maxWidth="Infinity"
+                                       fixedCellSize="34"
+                                       styleClass="articles-scroll-table">
                                 <columns>
-                                    <TableColumn fx:id="publicationYearColumn"
-                                                 text="Year"
-                                                 prefWidth="70"/>
-
-                                    <TableColumn fx:id="publicationTypeColumn"
-                                                 text="Type"
-                                                 prefWidth="100"/>
-
-                                    <TableColumn fx:id="publicationTitleColumn"
-                                                 text="Title"
-                                                 prefWidth="420"/>
-
-                                    <TableColumn fx:id="publicationVenueColumn"
-                                                 text="Venue"
-                                                 prefWidth="260"/>
-
-                                    <TableColumn fx:id="publicationAuthorsColumn"
-                                                 text="Authors"
-                                                 prefWidth="300"/>
-
-                                    <TableColumn fx:id="publicationPagesColumn"
-                                                 text="Pages"
-                                                 prefWidth="90"/>
-
-                                    <TableColumn fx:id="publicationUrlColumn"
-                                                 text="URL / EE"
-                                                 prefWidth="180"/>
+                                    <TableColumn fx:id="publicationYearColumn" text="Year" prefWidth="80"/>
+                                    <TableColumn fx:id="publicationTypeColumn" text="Type" prefWidth="100"/>
+                                    <TableColumn fx:id="publicationTitleColumn" text="Title" prefWidth="430"/>
+                                    <TableColumn fx:id="publicationVenueColumn" text="Venue" prefWidth="260"/>
+                                    <TableColumn fx:id="publicationAuthorsColumn" text="Authors" prefWidth="330"/>
+                                    <TableColumn fx:id="publicationPagesColumn" text="Pages" prefWidth="100"/>
+                                    <TableColumn fx:id="publicationUrlColumn" text="URL / EE" prefWidth="180"/>
                                 </columns>
                             </TableView>
                         </VBox>

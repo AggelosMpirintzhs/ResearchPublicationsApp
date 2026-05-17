@@ -31,9 +31,9 @@ public class HelloApplication extends Application {
         );
 
         stage.setTitle("Research Publications App");
+        stage.setMinWidth(1050);
+        stage.setMinHeight(720);
         stage.setScene(scene);
-        stage.setMinWidth(1000);
-        stage.setMinHeight(700);
         stage.show();
     }
 

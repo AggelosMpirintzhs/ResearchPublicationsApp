@@ -7,12 +7,12 @@
 <?import javafx.scene.control.CheckBox?>
 <?import javafx.scene.control.ComboBox?>
 <?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ListView?>
 <?import javafx.scene.control.ScrollPane?>
 <?import javafx.scene.control.TableColumn?>
 <?import javafx.scene.control.TableView?>
 <?import javafx.scene.control.TextField?>
 <?import javafx.scene.layout.BorderPane?>
-<?import javafx.scene.layout.FlowPane?>
 <?import javafx.scene.layout.GridPane?>
 <?import javafx.scene.layout.HBox?>
 <?import javafx.scene.layout.Region?>
@@ -26,13 +26,18 @@
 
     <!-- ================= TOP BAR ================= -->
     <top>
-        <HBox spacing="16" styleClass="top-bar">
+        <HBox spacing="16" alignment="CENTER_LEFT" styleClass="top-bar">
             <padding>
-                <Insets top="16" right="24" bottom="16" left="24"/>
+                <Insets top="16" right="26" bottom="16" left="26"/>
             </padding>
 
-            <Label text="Research Publications App"
-                   styleClass="app-title"/>
+            <VBox spacing="2">
+                <Label text="Research Publications App"
+                       styleClass="app-title"/>
+
+                <Label text="Venue profile dashboard"
+                       styleClass="app-subtitle"/>
+            </VBox>
 
             <Region HBox.hgrow="ALWAYS"/>
 
@@ -50,53 +55,62 @@
             <content>
                 <StackPane>
                     <padding>
-                        <Insets top="28" right="42" bottom="42" left="42"/>
+                        <Insets top="28" right="42" bottom="44" left="42"/>
                     </padding>
 
                     <VBox spacing="22"
                           alignment="TOP_CENTER"
-                          maxWidth="1180">
+                          maxWidth="1200">
 
-                        <!-- Hero -->
-                        <VBox spacing="8"
+                        <!-- ================= HERO ================= -->
+                        <VBox spacing="10"
                               styleClass="venue-hero-card">
 
-                            <Label text="Journals / Conferences"
-                                   styleClass="venue-hero-title"/>
+                            <HBox alignment="CENTER_LEFT" spacing="14">
+                                <VBox spacing="6" HBox.hgrow="ALWAYS">
+                                    <Label text="Journals / Conferences"
+                                           styleClass="venue-hero-title"/>
 
-                            <Label text="Search for a journal or conference, choose one result, and view its ranking, yearly statistics, author activity, and optionally its article report."
-                                   styleClass="venue-hero-subtitle"
-                                   wrapText="true"/>
+                                    <Label text="Search, select and explore a journal or conference profile with ranking, yearly trends and article details."
+                                           styleClass="venue-hero-subtitle"
+                                           wrapText="true"/>
+                                </VBox>
+
+                                <Label text="PROFILE"
+                                       styleClass="hero-chip"/>
+                            </HBox>
                         </VBox>
 
-                        <!-- Filters -->
-                        <VBox spacing="14"
+                        <!-- ================= FILTERS ================= -->
+                        <VBox spacing="16"
                               styleClass="filter-card"
-                              maxWidth="1180">
+                              maxWidth="1200">
 
-                            <VBox spacing="4">
+                            <VBox spacing="5">
                                 <Label text="Search Filters"
                                        styleClass="content-title"/>
 
-                                <Label text="Choose Journal or Conference, search by name/acronym, select one result from the bar, and optionally restrict results to a year range. To year must be greater than or equal to From year."
+                                <Label text="Choose Journal or Conference, search by name/acronym, select one result from the list, and optionally restrict results to a year range."
                                        styleClass="stat-muted"
                                        wrapText="true"/>
                             </VBox>
 
                             <!-- Search row -->
-                            <HBox spacing="12">
+                            <HBox spacing="12" alignment="CENTER_LEFT" styleClass="form-row">
                                 <ComboBox fx:id="venueTypeComboBox"
                                           promptText="Journal / Conference"
-                                          prefWidth="200"/>
+                                          prefWidth="205"
+                                          styleClass="form-control"/>
 
                                 <TextField fx:id="venueSearchField"
                                            promptText="Search venue"
-                                           prefWidth="320"/>
+                                           prefWidth="340"
+                                           styleClass="form-control"/>
 
                                 <Button fx:id="searchVenueButton"
                                         text="Search"
                                         onAction="#searchVenues"
-                                        styleClass="secondary-button"/>
+                                        styleClass="primary-button"/>
 
                                 <Button fx:id="clearButton"
                                         text="Clear"
@@ -104,45 +118,62 @@
                                         styleClass="secondary-button"/>
                             </HBox>
 
-                            <!-- Results bar -->
-                            <VBox spacing="6">
-                                <Label text="Matching results"
-                                       styleClass="metric-label"/>
+                            <!-- Results panel - hidden before search -->
+                            <VBox fx:id="venueResultsContainer"
+                                  spacing="10"
+                                  visible="false"
+                                  managed="false"
+                                  styleClass="venue-results-panel">
 
-                                <FlowPane fx:id="venueResultsPane"
-                                          hgap="8"
-                                          vgap="8"
-                                          prefWrapLength="1050"
-                                          styleClass="results-bar"/>
+                                <HBox alignment="CENTER_LEFT" spacing="10">
+                                    <VBox spacing="2" HBox.hgrow="ALWAYS">
+                                        <Label text="Matching results"
+                                               styleClass="venue-results-title"/>
+
+                                        <Label text="Select one journal or conference from the list."
+                                               styleClass="venue-results-subtitle"/>
+                                    </VBox>
+
+                                    <Label text="SCROLL"
+                                           styleClass="small-blue-chip"/>
+                                </HBox>
+
+                                <ListView fx:id="venueResultsListView"
+                                          prefHeight="178"
+                                          minHeight="178"
+                                          maxHeight="178"
+                                          styleClass="venue-results-list"/>
                             </VBox>
 
                             <!-- Selected venue row -->
-                            <HBox spacing="8">
-                                <Label text="Selected:"
-                                       styleClass="metric-label"/>
+                            <HBox spacing="10" alignment="CENTER_LEFT" styleClass="selected-strip">
+                                <Label text="Selected"
+                                       styleClass="selected-label"/>
 
                                 <Label fx:id="selectedVenueLabel"
                                        text="No venue selected"
-                                       style="-fx-text-fill: #1f2937; -fx-font-weight: 600;"/>
+                                       styleClass="selected-value"/>
                             </HBox>
 
                             <!-- Year filters row -->
-                            <HBox spacing="12">
+                            <HBox spacing="12" alignment="CENTER_LEFT" styleClass="form-row">
                                 <ComboBox fx:id="fromYearComboBox"
                                           promptText="From year"
-                                          prefWidth="150"/>
+                                          prefWidth="155"
+                                          styleClass="form-control"/>
 
                                 <ComboBox fx:id="toYearComboBox"
                                           promptText="To year"
-                                          prefWidth="150"/>
+                                          prefWidth="155"
+                                          styleClass="form-control"/>
 
-                                <HBox spacing="6" alignment="CENTER_LEFT">
-                                    <CheckBox fx:id="loadArticlesCheckBox"
-                                              selected="false"/>
-
-                                    <Label text="Load articles"
-                                           style="-fx-text-fill: #1f2937; -fx-font-size: 13px;"/>
-                                </HBox>
+                                <CheckBox fx:id="loadArticlesCheckBox"
+                                          text="Load articles"
+                                          selected="false"
+                                          prefWidth="135"
+                                          minHeight="38"
+                                          alignment="CENTER_LEFT"
+                                          styleClass="load-articles-toggle"/>
 
                                 <Button fx:id="loadProfileButton"
                                         text="Load Profile"
@@ -150,24 +181,24 @@
                                         styleClass="primary-button"/>
 
                                 <Label text="To year must be ≥ From year"
-                                       style="-fx-text-fill: #6b7280; -fx-font-size: 12px;"/>
+                                       styleClass="hint-label"/>
                             </HBox>
                         </VBox>
 
-                        <!-- Ranking + Statistics -->
+                        <!-- ================= RANKING + STATISTICS ================= -->
                         <HBox spacing="20"
-                              maxWidth="1180">
+                              maxWidth="1200">
 
                             <!-- Ranking -->
-                            <VBox spacing="14"
+                            <VBox spacing="18"
                                   styleClass="ranking-card"
-                                  prefWidth="340"
-                                  minWidth="320">
+                                  prefWidth="365"
+                                  minWidth="345">
 
                                 <Label text="Ranking"
                                        styleClass="ranking-title"/>
 
-                                <VBox spacing="3">
+                                <VBox spacing="4">
                                     <Label text="Rank / Quartile"
                                            styleClass="ranking-label"/>
 
@@ -176,7 +207,7 @@
                                            styleClass="ranking-value"/>
                                 </VBox>
 
-                                <VBox spacing="3">
+                                <VBox spacing="4">
                                     <Label text="Category"
                                            styleClass="ranking-label"/>
 
@@ -185,7 +216,7 @@
                                            styleClass="ranking-value"/>
                                 </VBox>
 
-                                <VBox spacing="3">
+                                <VBox spacing="4">
                                     <Label text="Ranking metrics"
                                            styleClass="ranking-label"/>
 
@@ -197,16 +228,23 @@
                             </VBox>
 
                             <!-- Statistics -->
-                            <VBox spacing="14"
+                            <VBox spacing="16"
                                   styleClass="stats-panel"
                                   HBox.hgrow="ALWAYS">
 
-                                <Label text="Profile Statistics"
-                                       styleClass="content-title"/>
+                                <HBox alignment="CENTER_LEFT">
+                                    <Label text="Profile Statistics"
+                                           styleClass="content-title"/>
+
+                                    <Region HBox.hgrow="ALWAYS"/>
+
+                                    <Label text="SUMMARY"
+                                           styleClass="small-blue-chip"/>
+                                </HBox>
 
                                 <GridPane hgap="14" vgap="14">
 
-                                    <VBox spacing="4"
+                                    <VBox spacing="5"
                                           styleClass="metric-card"
                                           GridPane.rowIndex="0"
                                           GridPane.columnIndex="0">
@@ -214,7 +252,7 @@
                                         <Label fx:id="firstYearLabel" text="-" styleClass="metric-value"/>
                                     </VBox>
 
-                                    <VBox spacing="4"
+                                    <VBox spacing="5"
                                           styleClass="metric-card"
                                           GridPane.rowIndex="0"
                                           GridPane.columnIndex="1">
@@ -222,7 +260,7 @@
                                         <Label fx:id="lastYearLabel" text="-" styleClass="metric-value"/>
                                     </VBox>
 
-                                    <VBox spacing="4"
+                                    <VBox spacing="5"
                                           styleClass="metric-card"
                                           GridPane.rowIndex="0"
                                           GridPane.columnIndex="2">
@@ -230,7 +268,7 @@
                                         <Label fx:id="totalArticlesLabel" text="-" styleClass="metric-value"/>
                                     </VBox>
 
-                                    <VBox spacing="4"
+                                    <VBox spacing="5"
                                           styleClass="metric-card"
                                           GridPane.rowIndex="1"
                                           GridPane.columnIndex="0">
@@ -238,7 +276,7 @@
                                         <Label fx:id="totalAuthorsLabel" text="-" styleClass="metric-value"/>
                                     </VBox>
 
-                                    <VBox spacing="4"
+                                    <VBox spacing="5"
                                           styleClass="metric-card"
                                           GridPane.rowIndex="1"
                                           GridPane.columnIndex="1">
@@ -246,7 +284,7 @@
                                         <Label fx:id="distinctAuthorsLabel" text="-" styleClass="metric-value"/>
                                     </VBox>
 
-                                    <VBox spacing="4"
+                                    <VBox spacing="5"
                                           styleClass="metric-card"
                                           GridPane.rowIndex="1"
                                           GridPane.columnIndex="2">
@@ -254,7 +292,7 @@
                                         <Label fx:id="avgAuthorsArticleLabel" text="-" styleClass="metric-value"/>
                                     </VBox>
 
-                                    <VBox spacing="4"
+                                    <VBox spacing="5"
                                           styleClass="metric-card"
                                           GridPane.rowIndex="2"
                                           GridPane.columnIndex="0">
@@ -262,7 +300,7 @@
                                         <Label fx:id="avgArticlesYearLabel" text="-" styleClass="metric-value"/>
                                     </VBox>
 
-                                    <VBox spacing="4"
+                                    <VBox spacing="5"
                                           styleClass="metric-card"
                                           GridPane.rowIndex="2"
                                           GridPane.columnIndex="1">
@@ -275,102 +313,190 @@
 
                         </HBox>
 
-                        <!-- Yearly Charts -->
-                        <VBox spacing="14"
-                              alignment="CENTER"
-                              styleClass="dashboard-panel"
-                              maxWidth="920">
+                        <!-- ================= YEARLY CHARTS ================= -->
+                        <VBox spacing="16"
+                              styleClass="dashboard-panel charts-dashboard"
+                              maxWidth="1200">
 
-                            <VBox spacing="4" alignment="CENTER_LEFT">
-                                <Label text="Yearly Statistics"
-                                       styleClass="content-title"/>
+                            <HBox alignment="CENTER_LEFT">
+                                <VBox spacing="4" HBox.hgrow="ALWAYS">
+                                    <Label text="Yearly Statistics"
+                                           styleClass="content-title"/>
 
-                                <Label text="Separate line charts for articles, total author entries, and distinct authors per year. Each chart automatically adapts its axis range to its own values."
-                                       styleClass="stat-muted"
-                                       wrapText="true"/>
-                            </VBox>
+                                    <Label text="Yearly articles, total author entries and distinct authors. Each chart has its own axes and adapts to the selected values."
+                                           styleClass="stat-muted"
+                                           wrapText="true"/>
+                                </VBox>
 
-                            <LineChart fx:id="articlesLineChart"
-                                       title="Articles per year"
-                                       prefWidth="780"
-                                       maxWidth="780"
-                                       prefHeight="230"
-                                       minHeight="220"
-                                       animated="false"
-                                       createSymbols="false"
-                                       legendVisible="false">
-                                <xAxis>
-                                    <NumberAxis fx:id="articlesYearAxis"
-                                                label="Year"
-                                                forceZeroInRange="false"/>
-                                </xAxis>
-                                <yAxis>
-                                    <NumberAxis fx:id="articlesCountAxis"
-                                                label="Articles"
-                                                forceZeroInRange="true"/>
-                                </yAxis>
-                            </LineChart>
+                                <Label text="LINE CHARTS"
+                                       styleClass="small-blue-chip"/>
+                            </HBox>
 
-                            <LineChart fx:id="authorEntriesLineChart"
-                                       title="Author entries per year"
-                                       prefWidth="780"
-                                       maxWidth="780"
-                                       prefHeight="230"
-                                       minHeight="220"
-                                       animated="false"
-                                       createSymbols="false"
-                                       legendVisible="false">
-                                <xAxis>
-                                    <NumberAxis fx:id="authorEntriesYearAxis"
-                                                label="Year"
-                                                forceZeroInRange="false"/>
-                                </xAxis>
-                                <yAxis>
-                                    <NumberAxis fx:id="authorEntriesCountAxis"
-                                                label="Author entries"
-                                                forceZeroInRange="true"/>
-                                </yAxis>
-                            </LineChart>
+                            <HBox spacing="14"
+                                  alignment="TOP_CENTER"
+                                  styleClass="charts-row">
 
-                            <LineChart fx:id="distinctAuthorsLineChart"
-                                       title="Distinct authors per year"
-                                       prefWidth="780"
-                                       maxWidth="780"
-                                       prefHeight="230"
-                                       minHeight="220"
-                                       animated="false"
-                                       createSymbols="false"
-                                       legendVisible="false">
-                                <xAxis>
-                                    <NumberAxis fx:id="distinctAuthorsYearAxis"
-                                                label="Year"
-                                                forceZeroInRange="false"/>
-                                </xAxis>
-                                <yAxis>
-                                    <NumberAxis fx:id="distinctAuthorsCountAxis"
-                                                label="Distinct authors"
-                                                forceZeroInRange="true"/>
-                                </yAxis>
-                            </LineChart>
+                                <!-- Articles chart -->
+                                <VBox spacing="8"
+                                      styleClass="chart-card"
+                                      prefWidth="370"
+                                      HBox.hgrow="ALWAYS">
+
+                                    <Label text="Published Articles"
+                                           styleClass="chart-card-title"/>
+
+                                    <LineChart fx:id="articlesLineChart"
+                                               title=""
+                                               prefWidth="350"
+                                               prefHeight="260"
+                                               minHeight="250"
+                                               animated="false"
+                                               createSymbols="true"
+                                               legendVisible="false"
+                                               horizontalGridLinesVisible="true"
+                                               verticalGridLinesVisible="true"
+                                               alternativeRowFillVisible="false"
+                                               alternativeColumnFillVisible="false"
+                                               styleClass="beautiful-line-chart">
+                                        <xAxis>
+                                            <NumberAxis fx:id="articlesYearAxis"
+                                                        label="Year"
+                                                        forceZeroInRange="false"
+                                                        minorTickVisible="false"
+                                                        tickLabelsVisible="true"
+                                                        tickMarkVisible="true"
+                                                        tickUnit="1"/>
+                                        </xAxis>
+                                        <yAxis>
+                                            <NumberAxis fx:id="articlesCountAxis"
+                                                        label="Articles"
+                                                        forceZeroInRange="true"
+                                                        minorTickVisible="false"
+                                                        tickLabelsVisible="true"
+                                                        tickMarkVisible="true"/>
+                                        </yAxis>
+                                    </LineChart>
+                                </VBox>
+
+                                <!-- Author entries chart -->
+                                <VBox spacing="8"
+                                      styleClass="chart-card"
+                                      prefWidth="370"
+                                      HBox.hgrow="ALWAYS">
+
+                                    <Label text="Total Author Entries"
+                                           styleClass="chart-card-title"/>
+
+                                    <LineChart fx:id="authorEntriesLineChart"
+                                               title=""
+                                               prefWidth="350"
+                                               prefHeight="260"
+                                               minHeight="250"
+                                               animated="false"
+                                               createSymbols="true"
+                                               legendVisible="false"
+                                               horizontalGridLinesVisible="true"
+                                               verticalGridLinesVisible="true"
+                                               alternativeRowFillVisible="false"
+                                               alternativeColumnFillVisible="false"
+                                               styleClass="beautiful-line-chart">
+                                        <xAxis>
+                                            <NumberAxis fx:id="authorEntriesYearAxis"
+                                                        label="Year"
+                                                        forceZeroInRange="false"
+                                                        minorTickVisible="false"
+                                                        tickLabelsVisible="true"
+                                                        tickMarkVisible="true"
+                                                        tickUnit="1"/>
+                                        </xAxis>
+                                        <yAxis>
+                                            <NumberAxis fx:id="authorEntriesCountAxis"
+                                                        label="Author entries"
+                                                        forceZeroInRange="true"
+                                                        minorTickVisible="false"
+                                                        tickLabelsVisible="true"
+                                                        tickMarkVisible="true"/>
+                                        </yAxis>
+                                    </LineChart>
+                                </VBox>
+
+                                <!-- Distinct authors chart -->
+                                <VBox spacing="8"
+                                      styleClass="chart-card"
+                                      prefWidth="370"
+                                      HBox.hgrow="ALWAYS">
+
+                                    <Label text="Distinct Authors"
+                                           styleClass="chart-card-title"/>
+
+                                    <LineChart fx:id="distinctAuthorsLineChart"
+                                               title=""
+                                               prefWidth="350"
+                                               prefHeight="260"
+                                               minHeight="250"
+                                               animated="false"
+                                               createSymbols="true"
+                                               legendVisible="false"
+                                               horizontalGridLinesVisible="true"
+                                               verticalGridLinesVisible="true"
+                                               alternativeRowFillVisible="false"
+                                               alternativeColumnFillVisible="false"
+                                               styleClass="beautiful-line-chart">
+                                        <xAxis>
+                                            <NumberAxis fx:id="distinctAuthorsYearAxis"
+                                                        label="Year"
+                                                        forceZeroInRange="false"
+                                                        minorTickVisible="false"
+                                                        tickLabelsVisible="true"
+                                                        tickMarkVisible="true"
+                                                        tickUnit="1"/>
+                                        </xAxis>
+                                        <yAxis>
+                                            <NumberAxis fx:id="distinctAuthorsCountAxis"
+                                                        label="Distinct authors"
+                                                        forceZeroInRange="true"
+                                                        minorTickVisible="false"
+                                                        tickLabelsVisible="true"
+                                                        tickMarkVisible="true"/>
+                                        </yAxis>
+                                    </LineChart>
+                                </VBox>
+
+                            </HBox>
                         </VBox>
 
-                        <!-- Article Report -->
+                        <!-- ================= ARTICLE REPORT ================= -->
                         <VBox fx:id="articleReportPanel"
                               spacing="12"
-                              styleClass="dashboard-panel"
-                              maxWidth="1180">
+                              styleClass="dashboard-panel article-report-panel"
+                              maxWidth="1200"
+                              visible="false"
+                              managed="false">
 
-                            <VBox spacing="4">
-                                <Label text="Article Report"
-                                       styleClass="content-title"/>
+                            <HBox alignment="CENTER_LEFT" spacing="12">
+                                <VBox spacing="4" HBox.hgrow="ALWAYS">
+                                    <Label text="Article Report"
+                                           styleClass="content-title"/>
 
-                                <Label text="Articles are loaded only when the Load articles option is selected. If a year range is selected, only articles within that range will be displayed."
-                                       styleClass="stat-muted"
-                                       wrapText="true"/>
-                            </VBox>
+                                    <Label text="Articles are loaded only when the Load articles option is selected. Results are shown in a fixed-height scrollable table."
+                                           styleClass="stat-muted"
+                                           wrapText="true"/>
+                                </VBox>
+
+                                <Label fx:id="articlesLoadedLabel"
+                                       text="Articles Loaded: 0 / 0"
+                                       style="-fx-text-fill: #0f4c81; -fx-font-weight: 700; -fx-font-size: 13px;"/>
+
+                                <Label text="SCROLL TABLE"
+                                       styleClass="small-blue-chip"/>
+                            </HBox>
 
                             <TableView fx:id="articlesTable"
-                                       prefHeight="280">
+                                       prefHeight="350"
+                                       minHeight="350"
+                                       maxHeight="350"
+                                       fixedCellSize="34"
+                                       styleClass="articles-scroll-table">
                                 <columns>
                                     <TableColumn fx:id="yearColumn"
                                                  text="Year"

@@ -15,6 +15,12 @@ public class YearService {
 
     private static final int DEFAULT_FILTER_ID = 0;
 
+    private static final int DEFAULT_LAST_ARTICLE_ID = 0;
+
+    private static final int DEFAULT_BATCH_SIZE = 1000;
+
+    private static final int MAX_BATCH_SIZE = 5000;
+
     private static final Set<String> ALLOWED_PUBLICATION_TYPES = Set.of(
             "ALL",
             "JOURNAL",
@@ -64,6 +70,43 @@ public class YearService {
                 safeJournalId,
                 safeConferenceId,
                 safeAuthorId
+        );
+    }
+
+    public List<YearPublicationDto> getYearPublicationsBatch(
+            int year,
+            String publicationType,
+            Integer journalId,
+            Integer conferenceId,
+            Integer authorId,
+            Integer lastArticleId,
+            Integer batchSize
+    ) {
+        validateYear(year);
+
+        String safePublicationType = normalizePublicationType(publicationType);
+
+        int safeJournalId = normalizeFilterId(journalId, "journalId");
+        int safeConferenceId = normalizeFilterId(conferenceId, "conferenceId");
+        int safeAuthorId = normalizeFilterId(authorId, "authorId");
+
+        int safeLastArticleId = normalizeLastArticleId(lastArticleId);
+        int safeBatchSize = normalizeBatchSize(batchSize);
+
+        validateFilterCombination(
+                safePublicationType,
+                safeJournalId,
+                safeConferenceId
+        );
+
+        return yearRepository.findYearPublicationsBatch(
+                year,
+                safePublicationType,
+                safeJournalId,
+                safeConferenceId,
+                safeAuthorId,
+                safeLastArticleId,
+                safeBatchSize
         );
     }
 
@@ -136,6 +179,105 @@ public class YearService {
         );
     }
 
+    public List<YearPublicationDto> getAllYearPublicationsBatch(
+            int year,
+            Integer lastArticleId,
+            Integer batchSize
+    ) {
+        return getYearPublicationsBatch(
+                year,
+                "ALL",
+                DEFAULT_FILTER_ID,
+                DEFAULT_FILTER_ID,
+                DEFAULT_FILTER_ID,
+                lastArticleId,
+                batchSize
+        );
+    }
+
+    public List<YearPublicationDto> getYearJournalPublicationsBatch(
+            int year,
+            Integer lastArticleId,
+            Integer batchSize
+    ) {
+        return getYearPublicationsBatch(
+                year,
+                "JOURNAL",
+                DEFAULT_FILTER_ID,
+                DEFAULT_FILTER_ID,
+                DEFAULT_FILTER_ID,
+                lastArticleId,
+                batchSize
+        );
+    }
+
+    public List<YearPublicationDto> getYearConferencePublicationsBatch(
+            int year,
+            Integer lastArticleId,
+            Integer batchSize
+    ) {
+        return getYearPublicationsBatch(
+                year,
+                "CONFERENCE",
+                DEFAULT_FILTER_ID,
+                DEFAULT_FILTER_ID,
+                DEFAULT_FILTER_ID,
+                lastArticleId,
+                batchSize
+        );
+    }
+
+    public List<YearPublicationDto> getYearPublicationsByJournalBatch(
+            int year,
+            int journalId,
+            Integer lastArticleId,
+            Integer batchSize
+    ) {
+        return getYearPublicationsBatch(
+                year,
+                "JOURNAL",
+                journalId,
+                DEFAULT_FILTER_ID,
+                DEFAULT_FILTER_ID,
+                lastArticleId,
+                batchSize
+        );
+    }
+
+    public List<YearPublicationDto> getYearPublicationsByConferenceBatch(
+            int year,
+            int conferenceId,
+            Integer lastArticleId,
+            Integer batchSize
+    ) {
+        return getYearPublicationsBatch(
+                year,
+                "CONFERENCE",
+                DEFAULT_FILTER_ID,
+                conferenceId,
+                DEFAULT_FILTER_ID,
+                lastArticleId,
+                batchSize
+        );
+    }
+
+    public List<YearPublicationDto> getYearPublicationsByAuthorBatch(
+            int year,
+            int authorId,
+            Integer lastArticleId,
+            Integer batchSize
+    ) {
+        return getYearPublicationsBatch(
+                year,
+                "ALL",
+                DEFAULT_FILTER_ID,
+                DEFAULT_FILTER_ID,
+                authorId,
+                lastArticleId,
+                batchSize
+        );
+    }
+
     private void validateYear(int year) {
         if (year <= 0) {
             throw new IllegalArgumentException("Το year πρέπει να είναι θετικός αριθμός.");
@@ -168,6 +310,30 @@ public class YearService {
         }
 
         return id;
+    }
+
+    private int normalizeLastArticleId(Integer lastArticleId) {
+        if (lastArticleId == null) {
+            return DEFAULT_LAST_ARTICLE_ID;
+        }
+
+        if (lastArticleId < 0) {
+            throw new IllegalArgumentException("Το lastArticleId δεν μπορεί να είναι αρνητικό.");
+        }
+
+        return lastArticleId;
+    }
+
+    private int normalizeBatchSize(Integer batchSize) {
+        if (batchSize == null || batchSize <= 0) {
+            return DEFAULT_BATCH_SIZE;
+        }
+
+        if (batchSize > MAX_BATCH_SIZE) {
+            return MAX_BATCH_SIZE;
+        }
+
+        return batchSize;
     }
 
     private void validateFilterCombination(

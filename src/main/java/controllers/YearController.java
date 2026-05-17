@@ -3,8 +3,11 @@ package controllers;
 import dto.year.AvailableYearDto;
 import dto.year.YearProfileDto;
 import dto.year.YearPublicationDto;
+import javafx.application.Platform;
 import javafx.beans.property.ReadOnlyObjectWrapper;
 import javafx.beans.property.SimpleStringProperty;
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
 import javafx.concurrent.Task;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
@@ -33,14 +36,24 @@ public class YearController {
     private static final String TYPE_JOURNAL = "JOURNAL";
     private static final String TYPE_CONFERENCE = "CONFERENCE";
 
+    private static final int PUBLICATION_BATCH_SIZE = 1000;
+
     private final YearService yearService = new YearService();
+
+    private final ObservableList<YearPublicationDto> publicationItems =
+            FXCollections.observableArrayList();
+
+    private volatile boolean stopPublicationLoading = false;
+
+    private Task<Void> publicationLoadingTask;
+
+    private long expectedPublicationCount = 0;
 
     @FXML
     private ComboBox<AvailableYearDto> yearComboBox;
 
     @FXML
     private ComboBox<String> publicationTypeComboBox;
-
 
     @FXML
     private CheckBox loadPublicationsCheckBox;
@@ -88,6 +101,12 @@ public class YearController {
     private Label avgAuthorsPerArticleLabel;
 
     @FXML
+    private Label articlesLoadedLabel;
+
+    @FXML
+    private Label publicationLoadingLabel;
+
+    @FXML
     private VBox publicationReportPanel;
 
     @FXML
@@ -121,6 +140,10 @@ public class YearController {
         setupPublicationTable();
         setupLoadPublicationsOption();
 
+        if (publicationsTable != null) {
+            publicationsTable.setItems(publicationItems);
+        }
+
         clearResultArea();
         loadAvailableYears();
     }
@@ -152,8 +175,8 @@ public class YearController {
             List<AvailableYearDto> years = task.getValue();
 
             yearComboBox.getItems().setAll(years);
-
             yearComboBox.getSelectionModel().clearSelection();
+
             updateSelectedYearLabel(null);
 
             if (years.isEmpty()) {
@@ -170,9 +193,10 @@ public class YearController {
         startBackgroundTask(task, "available-years-task");
     }
 
-
     @FXML
     private void loadYearProfile() {
+        stopCurrentPublicationLoading();
+
         AvailableYearDto selectedYear = yearComboBox == null ? null : yearComboBox.getValue();
 
         if (selectedYear == null || selectedYear.year() == null) {
@@ -182,29 +206,14 @@ public class YearController {
 
         int year = selectedYear.year();
         String publicationType = getSelectedPublicationType();
-        boolean shouldLoadPublications = loadPublicationsCheckBox != null && loadPublicationsCheckBox.isSelected();
 
-        Task<YearPageData> task = new Task<>() {
+        boolean shouldLoadPublications =
+                loadPublicationsCheckBox != null && loadPublicationsCheckBox.isSelected();
+
+        Task<Optional<YearProfileDto>> task = new Task<>() {
             @Override
-            protected YearPageData call() {
-                Optional<YearProfileDto> profile = yearService.getYearProfile(year);
-
-                List<YearPublicationDto> publications = List.of();
-
-                if (shouldLoadPublications) {
-                    publications = yearService.getYearPublications(
-                            year,
-                            publicationType,
-                            null,
-                            null,
-                            null
-                    );
-                }
-
-                return new YearPageData(
-                        profile.orElse(null),
-                        publications
-                );
+            protected Optional<YearProfileDto> call() {
+                return yearService.getYearProfile(year);
             }
         };
 
@@ -213,9 +222,9 @@ public class YearController {
         task.setOnSucceeded(event -> {
             setLoading(false);
 
-            YearPageData data = task.getValue();
+            Optional<YearProfileDto> profile = task.getValue();
 
-            if (data.profile() == null) {
+            if (!profile.isPresent()) {
                 clearResultArea();
                 showInfo(
                         "Δεν βρέθηκαν δεδομένα",
@@ -224,13 +233,23 @@ public class YearController {
                 return;
             }
 
+            YearProfileDto profileDto = profile.get();
+
             updateSelectedYearLabel(selectedYear);
-            updateProfileLabels(data.profile());
+            updateProfileLabels(profileDto);
+
+            expectedPublicationCount = getExpectedPublicationCount(profileDto, publicationType);
 
             if (shouldLoadPublications) {
-                updatePublicationsTable(data.publications());
-            } else if (publicationsTable != null) {
-                publicationsTable.getItems().clear();
+                publicationItems.clear();
+                updateArticlesLoadedLabel(0, expectedPublicationCount);
+                setPublicationLoadingText("Loading publications...");
+                startPublicationBatchLoading(year, publicationType);
+            } else {
+                publicationItems.clear();
+                expectedPublicationCount = 0;
+                updateArticlesLoadedLabel(0, 0);
+                setPublicationLoadingText("Publication loading is disabled.");
             }
         });
 
@@ -243,8 +262,89 @@ public class YearController {
         startBackgroundTask(task, "year-profile-task");
     }
 
+    private void startPublicationBatchLoading(int year, String publicationType) {
+        stopCurrentPublicationLoading();
+
+        publicationItems.clear();
+        stopPublicationLoading = false;
+
+        publicationLoadingTask = new Task<>() {
+            @Override
+            protected Void call() {
+                int lastArticleId = 0;
+
+                while (!stopPublicationLoading && !isCancelled()) {
+                    List<YearPublicationDto> batch =
+                            yearService.getYearPublicationsBatch(
+                                    year,
+                                    publicationType,
+                                    null,
+                                    null,
+                                    null,
+                                    lastArticleId,
+                                    PUBLICATION_BATCH_SIZE
+                            );
+
+                    if (batch.isEmpty()) {
+                        break;
+                    }
+
+                    YearPublicationDto lastPublication = batch.get(batch.size() - 1);
+
+                    if (lastPublication.articleId() == null) {
+                        break;
+                    }
+
+                    lastArticleId = lastPublication.articleId();
+
+                    Platform.runLater(() -> {
+                        publicationItems.addAll(batch);
+                        updateArticlesLoadedLabel(publicationItems.size(), expectedPublicationCount);
+                        setPublicationLoadingText("Loaded publications: " + publicationItems.size());
+                    });
+                }
+
+                Platform.runLater(() -> {
+                    if (stopPublicationLoading || isCancelled()) {
+                        setPublicationLoadingText(
+                                "Publication loading stopped. Loaded: " + publicationItems.size()
+                        );
+                    } else {
+                        updateArticlesLoadedLabel(publicationItems.size(), expectedPublicationCount);
+                        setPublicationLoadingText(
+                                "Finished loading publications: " + publicationItems.size()
+                        );
+                    }
+                });
+
+                return null;
+            }
+        };
+
+        publicationLoadingTask.setOnFailed(event -> {
+            Throwable exception = publicationLoadingTask.getException();
+            setPublicationLoadingText("Error while loading publications.");
+            showError(
+                    "Σφάλμα φόρτωσης δημοσιεύσεων",
+                    exception == null ? null : exception.getMessage()
+            );
+        });
+
+        startBackgroundTask(publicationLoadingTask, "publication-batch-loading-task");
+    }
+
+    private void stopCurrentPublicationLoading() {
+        stopPublicationLoading = true;
+
+        if (publicationLoadingTask != null && publicationLoadingTask.isRunning()) {
+            publicationLoadingTask.cancel();
+        }
+    }
+
     @FXML
     private void clear() {
+        stopCurrentPublicationLoading();
+
         if (yearComboBox != null) {
             yearComboBox.getSelectionModel().clearSelection();
         }
@@ -259,10 +359,13 @@ public class YearController {
 
         updateSelectedYearLabel(null);
         clearResultArea();
+        setPublicationLoadingText("Publications cleared.");
     }
 
     @FXML
     private void backToHome() {
+        stopCurrentPublicationLoading();
+
         try {
             Parent root = FXMLLoader.load(
                     getClass().getResource(HOME_FXML_PATH)
@@ -336,8 +439,12 @@ public class YearController {
             loadPublicationsCheckBox.selectedProperty().addListener((observable, oldValue, newValue) -> {
                 updatePublicationReportVisibility();
 
-                if (!newValue && publicationsTable != null) {
-                    publicationsTable.getItems().clear();
+                if (!newValue) {
+                    stopCurrentPublicationLoading();
+                    publicationItems.clear();
+                    expectedPublicationCount = 0;
+                    updateArticlesLoadedLabel(0, 0);
+                    setPublicationLoadingText("Publication loading is disabled.");
                 }
             });
         }
@@ -414,12 +521,6 @@ public class YearController {
         setLabelText(avgAuthorsPerArticleLabel, formatDouble(profile.avgAuthorsPerArticle()));
     }
 
-    private void updatePublicationsTable(List<YearPublicationDto> publications) {
-        if (publicationsTable != null) {
-            publicationsTable.getItems().setAll(publications);
-        }
-    }
-
     private void clearResultArea() {
         setLabelText(yearLabel, "-");
 
@@ -434,9 +535,10 @@ public class YearController {
         setLabelText(distinctAuthorsLabel, "-");
         setLabelText(avgAuthorsPerArticleLabel, "-");
 
-        if (publicationsTable != null) {
-            publicationsTable.getItems().clear();
-        }
+        publicationItems.clear();
+
+        expectedPublicationCount = 0;
+        updateArticlesLoadedLabel(0, 0);
     }
 
     private void updateSelectedYearLabel(AvailableYearDto yearDto) {
@@ -465,6 +567,43 @@ public class YearController {
         }
 
         return publicationTypeComboBox.getValue();
+    }
+
+    private long getExpectedPublicationCount(
+            YearProfileDto profile,
+            String publicationType
+    ) {
+        if (profile == null) {
+            return 0;
+        }
+
+        if (TYPE_JOURNAL.equals(publicationType)) {
+            return nullToZero(profile.totalJournalArticles());
+        }
+
+        if (TYPE_CONFERENCE.equals(publicationType)) {
+            return nullToZero(profile.totalConferenceArticles());
+        }
+
+        return nullToZero(profile.totalArticles());
+    }
+
+    private long nullToZero(Long value) {
+        return value == null ? 0 : value;
+    }
+
+    private void updateArticlesLoadedLabel(long loaded, long total) {
+        if (articlesLoadedLabel != null) {
+            articlesLoadedLabel.setText(
+                    "Articles Loaded: " + loaded + " / " + total
+            );
+        }
+    }
+
+    private void setPublicationLoadingText(String text) {
+        if (publicationLoadingLabel != null) {
+            publicationLoadingLabel.setText(text);
+        }
     }
 
     private String buildVenueDisplayName(YearPublicationDto publication) {
@@ -577,11 +716,5 @@ public class YearController {
         alert.setHeaderText(title);
         alert.setContentText(message == null || message.isBlank() ? "-" : message);
         alert.showAndWait();
-    }
-
-    private record YearPageData(
-            YearProfileDto profile,
-            List<YearPublicationDto> publications
-    ) {
     }
 }

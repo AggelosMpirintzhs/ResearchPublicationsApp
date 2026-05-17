@@ -74,6 +74,40 @@ public class ConferenceRepository {
         }
     }
 
+    public List<ConferenceArticleDto> findConferenceArticlesBatch(
+            int conferenceId,
+            int startYear,
+            int endYear,
+            int lastArticleId,
+            int batchSize
+    ) {
+        String sql = SqlFileLoader.load("sql/conference/conference_articles_report_batch.sql");
+
+        try (
+                Connection connection = DatabaseManager.getConnection();
+                PreparedStatement statement = connection.prepareStatement(sql)
+        ) {
+            statement.setInt(1, conferenceId);
+            statement.setInt(2, startYear);
+            statement.setInt(3, endYear);
+            statement.setInt(4, lastArticleId);
+            statement.setInt(5, batchSize);
+
+            try (ResultSet rs = statement.executeQuery()) {
+                List<ConferenceArticleDto> results = new ArrayList<>();
+
+                while (rs.next()) {
+                    results.add(mapConferenceArticle(rs));
+                }
+
+                return results;
+            }
+
+        } catch (SQLException exception) {
+            throw new RuntimeException("Αποτυχία φόρτωσης batch άρθρων συνεδρίου.", exception);
+        }
+    }
+
     public List<ConferenceYearlyStatsDto> findConferenceYearlyStats(
             int conferenceId,
             int startYear,
