@@ -10,6 +10,7 @@ import javafx.concurrent.Task;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
 import javafx.geometry.Pos;
+import javafx.scene.Cursor;
 import javafx.scene.Node;
 import javafx.scene.Parent;
 import javafx.scene.chart.BarChart;
@@ -88,14 +89,20 @@ public class ChartsController {
 
     private Task<List<Object>> venueSearchTask;
 
+    // Kratame poio venue einai prosorina highlighted apo hover sto chart i sto legend.
+    private String activeVenueKey;
+
+    // Edw apothikevoume handlers gia ola ta chart nodes, oste na allazoun style mazi.
+    private final List<ChartHighlightHandle> chartHighlightHandles = new ArrayList<>();
+
+    // Edw apothikevoume handlers gia ta custom legend items.
+    private final List<LegendHighlightHandle> legendHighlightHandles = new ArrayList<>();
+
     @FXML
     private ComboBox<String> venueTypeComboBox;
 
     @FXML
     private TextField venueSearchField;
-
-    @FXML
-    private Button searchButton;
 
     @FXML
     private Button addSelectedButton;
@@ -243,10 +250,7 @@ public class ChartsController {
             if (showAlerts && searchText.isBlank()) {
                 showError("Λάθος αναζήτηση", "Πρέπει να γράψεις όνομα journal ή conference.");
             } else if (showAlerts) {
-                showError(
-                        "Λάθος αναζήτηση",
-                        "Πρέπει να γράψεις τουλάχιστον 3 χαρακτήρες."
-                );
+                showError("Λάθος αναζήτηση", "Πρέπει να γράψεις τουλάχιστον 3 χαρακτήρες.");
             }
 
             return;
@@ -457,6 +461,7 @@ public class ChartsController {
                                 new VenueChartSeries(
                                         getVenueDisplayName(selectedVenue),
                                         selectedVenue.type(),
+                                        journalId,
                                         yearlyStats
                                 )
                         );
@@ -482,6 +487,7 @@ public class ChartsController {
                                 new VenueChartSeries(
                                         getVenueDisplayName(selectedVenue),
                                         selectedVenue.type(),
+                                        conferenceId,
                                         yearlyStats
                                 )
                         );
@@ -662,10 +668,6 @@ public class ChartsController {
             }
         });
 
-        /*
-         * To Enter menei san extra shortcut,
-         * alla den einai pleon aparaitito.
-         */
         venueSearchField.setOnAction(event -> searchVenues());
     }
 
@@ -793,11 +795,13 @@ public class ChartsController {
         if (scatterArticlesAxis != null) {
             scatterArticlesAxis.setAutoRanging(false);
             scatterArticlesAxis.setForceZeroInRange(true);
+            scatterArticlesAxis.setLabel("Articles / year");
         }
 
         if (scatterAuthorsAxis != null) {
             scatterAuthorsAxis.setAutoRanging(false);
             scatterAuthorsAxis.setForceZeroInRange(true);
+            scatterAuthorsAxis.setLabel("Avg authors / article");
         }
     }
 
@@ -1016,7 +1020,8 @@ public class ChartsController {
                 comparisonLineChart.getData().add(series);
 
                 final int colorIndex = seriesIndex;
-                runAfterChartRender(() -> applyLineSeriesColor(series, colorIndex));
+                final VenueChartSeries currentVenueSeries = venueSeries;
+                runAfterChartRender(() -> applyLineSeriesColor(series, colorIndex, currentVenueSeries));
             }
 
             seriesIndex++;
@@ -1091,7 +1096,8 @@ public class ChartsController {
             chart.getData().add(series);
 
             final int colorIndex = seriesIndex;
-            runAfterChartRender(() -> applyBarColor(dataPoint, colorIndex));
+            final VenueChartSeries currentVenueSeries = venueSeries;
+            runAfterChartRender(() -> applyBarColor(dataPoint, colorIndex, currentVenueSeries));
 
             maxValue = Math.max(maxValue, value);
             seriesIndex++;
@@ -1138,44 +1144,60 @@ public class ChartsController {
             return;
         }
 
-        double maxArticles = 0;
-        double maxAvgAuthors = 0;
+        double maxArticlesPerYear = 0;
+        double maxAvgAuthorsPerArticle = 0;
         int seriesIndex = 0;
 
         for (VenueChartSeries venueSeries : allSeries) {
-            VenueAggregate aggregate = calculateVenueAggregate(venueSeries);
-
-            maxArticles = Math.max(maxArticles, aggregate.totalArticles());
-            maxAvgAuthors = Math.max(maxAvgAuthors, aggregate.avgAuthorEntriesPerYear());
-
             XYChart.Series<Number, Number> series = new XYChart.Series<>();
             series.setName(shortenSeriesName(venueSeries.name()));
 
-            XYChart.Data<Number, Number> dataPoint =
-                    new XYChart.Data<>(
-                            aggregate.totalArticles(),
-                            aggregate.avgAuthorEntriesPerYear()
-                    );
+            for (Object stat : venueSeries.yearlyStats()) {
+                Integer year = extractYear(stat);
+                Long articlesValue = extractMetricValue(stat, METRIC_ARTICLES);
+                Long authorEntriesValue = extractMetricValue(stat, METRIC_AUTHOR_ENTRIES);
 
-            series.getData().add(dataPoint);
-            venueScatterChart.getData().add(series);
+                if (year == null || articlesValue == null || authorEntriesValue == null) {
+                    continue;
+                }
 
-            final int colorIndex = seriesIndex;
-            runAfterChartRender(() -> applyScatterColor(dataPoint, colorIndex));
+                double articlesPerYear = articlesValue;
+                double avgAuthorsPerArticle = articlesValue == 0
+                        ? 0
+                        : (double) authorEntriesValue / articlesValue;
+
+                maxArticlesPerYear = Math.max(maxArticlesPerYear, articlesPerYear);
+                maxAvgAuthorsPerArticle = Math.max(maxAvgAuthorsPerArticle, avgAuthorsPerArticle);
+
+                XYChart.Data<Number, Number> dataPoint =
+                        new XYChart.Data<>(articlesPerYear, avgAuthorsPerArticle);
+
+                dataPoint.setExtraValue(year);
+
+                series.getData().add(dataPoint);
+
+                final int colorIndex = seriesIndex;
+                final VenueChartSeries currentVenueSeries = venueSeries;
+                runAfterChartRender(() -> applyScatterColor(dataPoint, colorIndex, currentVenueSeries));
+            }
+
+            if (!series.getData().isEmpty()) {
+                venueScatterChart.getData().add(series);
+            }
 
             seriesIndex++;
         }
 
         if (scatterArticlesAxis != null) {
-            scatterArticlesAxis.setLabel("Total articles");
+            scatterArticlesAxis.setLabel("Articles / year");
         }
 
         if (scatterAuthorsAxis != null) {
-            scatterAuthorsAxis.setLabel("Avg author entries / year");
+            scatterAuthorsAxis.setLabel("Avg authors / article");
         }
 
-        configureValueAxis(scatterArticlesAxis, maxArticles);
-        configureValueAxis(scatterAuthorsAxis, maxAvgAuthors);
+        configureValueAxis(scatterArticlesAxis, maxArticlesPerYear);
+        configureValueAxis(scatterAuthorsAxis, maxAvgAuthorsPerArticle);
     }
 
     private VenueAggregate calculateVenueAggregate(VenueChartSeries venueSeries) {
@@ -1219,6 +1241,8 @@ public class ChartsController {
     }
 
     private void clearChart() {
+        clearInteractiveHighlightState();
+
         if (comparisonLineChart != null) {
             comparisonLineChart.getData().clear();
         }
@@ -1369,66 +1393,324 @@ public class ChartsController {
         Platform.runLater(() -> Platform.runLater(action));
     }
 
-    private void applyLineSeriesColor(XYChart.Series<Number, Number> series, int colorIndex) {
-        if (series == null) {
+    private void applyLineSeriesColor(
+            XYChart.Series<Number, Number> series,
+            int colorIndex,
+            VenueChartSeries venueSeries
+    ) {
+        if (series == null || venueSeries == null) {
             return;
         }
 
         String color = getChartColor(colorIndex);
-        Node line = series.getNode();
+        String venueKey = getVenueKey(venueSeries);
 
-        if (line != null) {
-            line.setStyle(
-                    "-fx-stroke: " + color + ";" +
-                            "-fx-stroke-width: 2.4px;"
-            );
+        Runnable normalStyle = () -> {
+            Node line = series.getNode();
+
+            if (line != null) {
+                line.setStyle(getLineStyle(color, false));
+            }
+
+            for (XYChart.Data<Number, Number> data : series.getData()) {
+                Node symbol = data.getNode();
+
+                if (symbol != null) {
+                    symbol.setStyle(getLineSymbolStyle(color, false));
+                }
+            }
+        };
+
+        Runnable highlightedStyle = () -> {
+            Node line = series.getNode();
+
+            if (line != null) {
+                line.setStyle(getLineStyle(color, true));
+                line.toFront();
+            }
+
+            for (XYChart.Data<Number, Number> data : series.getData()) {
+                Node symbol = data.getNode();
+
+                if (symbol != null) {
+                    symbol.setStyle(getLineSymbolStyle(color, true));
+                    symbol.toFront();
+                }
+            }
+        };
+
+        normalStyle.run();
+        registerChartHighlight(venueKey, normalStyle, highlightedStyle);
+
+        // Hover panw sti grammi: kanei highlight kai ti grammi kai to antistoixo legend item.
+        setupChartHover(series.getNode(), venueKey);
+
+        // Hover panw se kapoio symbol tis grammis, gia na douleuei kai otan o xristis de stoxevei akrivos ti grammi.
+        for (XYChart.Data<Number, Number> data : series.getData()) {
+            setupChartHover(data.getNode(), venueKey);
+        }
+    }
+
+    private void applyBarColor(
+            XYChart.Data<String, Number> dataPoint,
+            int colorIndex,
+            VenueChartSeries venueSeries
+    ) {
+        if (dataPoint == null || dataPoint.getNode() == null || venueSeries == null) {
+            return;
         }
 
-        for (XYChart.Data<Number, Number> data : series.getData()) {
-            Node symbol = data.getNode();
+        String color = getChartColor(colorIndex);
+        String venueKey = getVenueKey(venueSeries);
+        Node barNode = dataPoint.getNode();
 
-            if (symbol != null) {
-                symbol.setStyle(
-                        "-fx-background-color: " + color + ", white;" +
-                                "-fx-background-insets: 0, 2;" +
-                                "-fx-background-radius: 7px;" +
-                                "-fx-padding: 4px;"
-                );
+        Runnable normalStyle = () -> barNode.setStyle(getBarStyle(color, false));
+        Runnable highlightedStyle = () -> {
+            barNode.setStyle(getBarStyle(color, true));
+            barNode.toFront();
+        };
+
+        normalStyle.run();
+        registerChartHighlight(venueKey, normalStyle, highlightedStyle);
+        setupChartHover(barNode, venueKey);
+    }
+
+    private void applyScatterColor(
+            XYChart.Data<Number, Number> dataPoint,
+            int colorIndex,
+            VenueChartSeries venueSeries
+    ) {
+        if (dataPoint == null || dataPoint.getNode() == null || venueSeries == null) {
+            return;
+        }
+
+        String color = getChartColor(colorIndex);
+        String venueKey = getVenueKey(venueSeries);
+        Node scatterNode = dataPoint.getNode();
+
+        Runnable normalStyle = () -> scatterNode.setStyle(getScatterStyle(color, false));
+        Runnable highlightedStyle = () -> {
+            scatterNode.setStyle(getScatterStyle(color, true));
+            scatterNode.toFront();
+        };
+
+        normalStyle.run();
+        registerChartHighlight(venueKey, normalStyle, highlightedStyle);
+        setupChartHover(scatterNode, venueKey);
+    }
+
+    private void registerChartHighlight(String venueKey, Runnable normalStyle, Runnable highlightedStyle) {
+        if (venueKey == null || venueKey.isBlank()) {
+            return;
+        }
+
+        chartHighlightHandles.add(
+                new ChartHighlightHandle(
+                        venueKey,
+                        normalStyle,
+                        highlightedStyle
+                )
+        );
+
+        applyActiveVenueHighlight();
+    }
+
+    private void setupChartHover(Node node, String venueKey) {
+        if (node == null || venueKey == null || venueKey.isBlank()) {
+            return;
+        }
+
+        node.setCursor(Cursor.HAND);
+        node.setMouseTransparent(false);
+
+        node.setOnMouseEntered(event -> {
+            setActiveVenueHighlight(venueKey);
+            event.consume();
+        });
+
+        node.setOnMouseExited(event -> {
+            setActiveVenueHighlight(null);
+            event.consume();
+        });
+    }
+
+    private void setActiveVenueHighlight(String venueKey) {
+        boolean sameVenue = activeVenueKey == null
+                ? venueKey == null
+                : activeVenueKey.equals(venueKey);
+
+        if (sameVenue) {
+            return;
+        }
+
+        activeVenueKey = venueKey;
+        applyActiveVenueHighlight();
+    }
+
+    private void applyActiveVenueHighlight() {
+        for (ChartHighlightHandle handle : chartHighlightHandles) {
+            boolean highlighted = activeVenueKey != null && activeVenueKey.equals(handle.venueKey());
+
+            if (highlighted) {
+                handle.highlightedStyle().run();
+            } else {
+                handle.normalStyle().run();
             }
         }
+
+        for (LegendHighlightHandle handle : legendHighlightHandles) {
+            boolean highlighted = activeVenueKey != null && activeVenueKey.equals(handle.venueKey());
+            applyLegendStyle(handle, highlighted);
+        }
     }
 
-    private void applyBarColor(XYChart.Data<String, Number> dataPoint, int colorIndex) {
-        if (dataPoint == null || dataPoint.getNode() == null) {
+    private void clearInteractiveHighlightState() {
+        activeVenueKey = null;
+        chartHighlightHandles.clear();
+        legendHighlightHandles.clear();
+    }
+
+    private void applyLegendStyle(LegendHighlightHandle handle, boolean highlighted) {
+        if (handle == null) {
             return;
         }
 
-        String color = getChartColor(colorIndex);
-
-        dataPoint.getNode().setStyle(
-                "-fx-bar-fill: " + color + ";"
-        );
-    }
-
-    private void applyScatterColor(XYChart.Data<Number, Number> dataPoint, int colorIndex) {
-        if (dataPoint == null || dataPoint.getNode() == null) {
-            return;
+        if (handle.legendItem() != null) {
+            handle.legendItem().setStyle(getLegendItemStyle(handle.color(), highlighted));
         }
 
-        String color = getChartColor(colorIndex);
+        if (handle.colorDot() != null) {
+            double dotSize = highlighted ? 13 : 10;
 
-        dataPoint.getNode().setStyle(
-                "-fx-background-color: " + color + ", white;" +
-                        "-fx-background-insets: 0, 2;" +
-                        "-fx-background-radius: 8px;" +
-                        "-fx-padding: 5px;"
-        );
+            handle.colorDot().setMinSize(dotSize, dotSize);
+            handle.colorDot().setPrefSize(dotSize, dotSize);
+            handle.colorDot().setMaxSize(dotSize, dotSize);
+            handle.colorDot().setStyle(getLegendDotStyle(handle.color(), highlighted));
+        }
+
+        if (handle.nameLabel() != null) {
+            handle.nameLabel().setStyle(getLegendLabelStyle(highlighted));
+        }
+    }
+
+    private String getLineStyle(String color, boolean highlighted) {
+        if (highlighted) {
+            return "-fx-stroke: " + color + ";" +
+                    "-fx-stroke-width: 5.2px;" +
+                    "-fx-opacity: 1.0;" +
+                    "-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.40), 8, 0.25, 0, 0);";
+        }
+
+        return "-fx-stroke: " + color + ";" +
+                "-fx-stroke-width: 2.4px;" +
+                "-fx-opacity: 0.92;";
+    }
+
+    private String getLineSymbolStyle(String color, boolean highlighted) {
+        if (highlighted) {
+            return "-fx-background-color: " + color + ", white;" +
+                    "-fx-background-insets: 0, 3;" +
+                    "-fx-background-radius: 10px;" +
+                    "-fx-padding: 7px;" +
+                    "-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.35), 7, 0.25, 0, 0);";
+        }
+
+        return "-fx-background-color: " + color + ", white;" +
+                "-fx-background-insets: 0, 2;" +
+                "-fx-background-radius: 7px;" +
+                "-fx-padding: 4px;";
+    }
+
+    private String getBarStyle(String color, boolean highlighted) {
+        if (highlighted) {
+            return "-fx-bar-fill: " + color + ";" +
+                    "-fx-border-color: #17212b;" +
+                    "-fx-border-width: 2px;" +
+                    "-fx-border-radius: 3px 3px 0 0;" +
+                    "-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.35), 8, 0.25, 0, 0);";
+        }
+
+        return "-fx-bar-fill: " + color + ";" +
+                "-fx-border-width: 0;";
+    }
+
+    private String getScatterStyle(String color, boolean highlighted) {
+        if (highlighted) {
+            return "-fx-background-color: " + color + ", white;" +
+                    "-fx-background-insets: 0, 3;" +
+                    "-fx-background-radius: 11px;" +
+                    "-fx-padding: 8px;" +
+                    "-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.35), 8, 0.25, 0, 0);";
+        }
+
+        return "-fx-background-color: " + color + ", white;" +
+                "-fx-background-insets: 0, 2;" +
+                "-fx-background-radius: 8px;" +
+                "-fx-padding: 5px;";
+    }
+
+    private String getLegendItemStyle(String color, boolean highlighted) {
+        if (highlighted) {
+            return "-fx-background-color: rgba(255,255,255,1.0);" +
+                    "-fx-border-color: " + color + ";" +
+                    "-fx-border-width: 2px;" +
+                    "-fx-border-radius: 999px;" +
+                    "-fx-background-radius: 999px;" +
+                    "-fx-padding: 5 9 5 9;" +
+                    "-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.28), 6, 0.20, 0, 0);";
+        }
+
+        return "-fx-background-color: rgba(255,255,255,0.95);" +
+                "-fx-border-color: #b9daf7;" +
+                "-fx-border-width: 1px;" +
+                "-fx-border-radius: 999px;" +
+                "-fx-background-radius: 999px;" +
+                "-fx-padding: 5 9 5 9;";
+    }
+
+    private String getLegendDotStyle(String color, boolean highlighted) {
+        if (highlighted) {
+            return "-fx-background-color: " + color + ";" +
+                    "-fx-background-radius: 999px;" +
+                    "-fx-border-color: #17212b;" +
+                    "-fx-border-radius: 999px;" +
+                    "-fx-border-width: 1.5px;";
+        }
+
+        return "-fx-background-color: " + color + ";" +
+                "-fx-background-radius: 999px;" +
+                "-fx-border-width: 0;";
+    }
+
+    private String getLegendLabelStyle(boolean highlighted) {
+        if (highlighted) {
+            return "-fx-text-fill: #17212b;" +
+                    "-fx-font-size: 11px;" +
+                    "-fx-font-weight: 900;";
+        }
+
+        return "-fx-text-fill: #0f4c81;" +
+                "-fx-font-size: 11px;" +
+                "-fx-font-weight: 700;";
+    }
+
+    private String getVenueKey(VenueChartSeries venueSeries) {
+        if (venueSeries == null) {
+            return "";
+        }
+
+        return venueSeries.type() + "#" + venueSeries.venueId();
     }
 
     private void updateCustomLegend(List<VenueChartSeries> allSeries) {
+        // Katharizoume mono ta legend handles. Ta chart handles katharizontai otan ginetai clear/redraw chart.
+        legendHighlightHandles.clear();
+
         updateLegendFlow(lineChartLegendBox, lineChartLegendFlow, allSeries);
         updateLegendFlow(barChartsLegendBox, barChartsLegendFlow, allSeries);
         updateLegendFlow(scatterLegendBox, scatterLegendFlow, allSeries);
+
+        applyActiveVenueHighlight();
     }
 
     private void updateLegendFlow(
@@ -1452,6 +1734,7 @@ public class ChartsController {
 
         for (VenueChartSeries venueSeries : allSeries) {
             String color = getChartColor(index);
+            String venueKey = getVenueKey(venueSeries);
             String fullName = venueSeries.name();
             String shortName = shortenSeriesName(fullName);
 
@@ -1459,17 +1742,10 @@ public class ChartsController {
             colorDot.setMinSize(10, 10);
             colorDot.setPrefSize(10, 10);
             colorDot.setMaxSize(10, 10);
-            colorDot.setStyle(
-                    "-fx-background-color: " + color + ";" +
-                            "-fx-background-radius: 999px;"
-            );
+            colorDot.setStyle(getLegendDotStyle(color, false));
 
             Label nameLabel = new Label(shortName);
-            nameLabel.setStyle(
-                    "-fx-text-fill: #0f4c81;" +
-                            "-fx-font-size: 11px;" +
-                            "-fx-font-weight: 700;"
-            );
+            nameLabel.setStyle(getLegendLabelStyle(false));
 
             if (fullName != null && fullName.length() > 45) {
                 Tooltip.install(nameLabel, new Tooltip(fullName));
@@ -1477,13 +1753,47 @@ public class ChartsController {
 
             HBox legendItem = new HBox(6, colorDot, nameLabel);
             legendItem.setAlignment(Pos.CENTER_LEFT);
-            legendItem.setStyle(
-                    "-fx-background-color: rgba(255,255,255,0.95);" +
-                            "-fx-border-color: #b9daf7;" +
-                            "-fx-border-radius: 999px;" +
-                            "-fx-background-radius: 999px;" +
-                            "-fx-padding: 5 9 5 9;"
+            legendItem.setCursor(Cursor.HAND);
+            legendItem.setStyle(getLegendItemStyle(color, false));
+
+            Tooltip.install(
+                    legendItem,
+                    new Tooltip("Hover to highlight. Double click to remove this venue.")
             );
+
+            LegendHighlightHandle legendHandle = new LegendHighlightHandle(
+                    venueKey,
+                    legendItem,
+                    colorDot,
+                    nameLabel,
+                    color
+            );
+
+            legendHighlightHandles.add(legendHandle);
+
+            VenueChartSeries currentVenueSeries = venueSeries;
+
+            // Hover sto legend: kanei highlight kai to antistoixo chart item/series.
+            legendItem.setOnMouseEntered(event -> setActiveVenueHighlight(venueKey));
+            legendItem.setOnMouseExited(event -> setActiveVenueHighlight(null));
+
+            legendItem.setOnMouseClicked(event -> {
+                if (event.getButton() != MouseButton.PRIMARY) {
+                    return;
+                }
+
+                if (event.getClickCount() == 2) {
+                    // Double click sto legend => afairesi apo ta selected venues kai refresh ton charts.
+                    removeVenueFromLegend(currentVenueSeries);
+                    event.consume();
+                    return;
+                }
+
+                if (event.getClickCount() == 1) {
+                    selectVenueFromLegend(currentVenueSeries);
+                    event.consume();
+                }
+            });
 
             legendFlow.getChildren().add(legendItem);
             index++;
@@ -1491,6 +1801,54 @@ public class ChartsController {
 
         legendBox.setVisible(true);
         legendBox.setManaged(true);
+    }
+
+    private void selectVenueFromLegend(VenueChartSeries venueSeries) {
+        if (venueSeries == null || selectedVenuesListView == null) {
+            return;
+        }
+
+        for (SelectedVenue selectedVenue : selectedVenuesListView.getItems()) {
+            boolean sameType = selectedVenue.type().equals(venueSeries.type());
+            boolean sameId = getVenueId(selectedVenue.venue()) == venueSeries.venueId();
+
+            if (sameType && sameId) {
+                selectedVenuesListView.getSelectionModel().select(selectedVenue);
+                selectedVenuesListView.scrollTo(selectedVenue);
+                return;
+            }
+        }
+    }
+
+    private void removeVenueFromLegend(VenueChartSeries venueSeries) {
+        if (venueSeries == null || selectedVenuesListView == null) {
+            return;
+        }
+
+        SelectedVenue venueToRemove = null;
+
+        for (SelectedVenue selectedVenue : selectedVenuesListView.getItems()) {
+            boolean sameType = selectedVenue.type().equals(venueSeries.type());
+            boolean sameId = getVenueId(selectedVenue.venue()) == venueSeries.venueId();
+
+            if (sameType && sameId) {
+                venueToRemove = selectedVenue;
+                break;
+            }
+        }
+
+        if (venueToRemove == null) {
+            return;
+        }
+
+        selectedVenuesListView.getItems().remove(venueToRemove);
+        setActiveVenueHighlight(null);
+
+        if (selectedVenuesListView.getItems().isEmpty()) {
+            clearChart();
+        } else {
+            loadChart();
+        }
     }
 
     private YearRange getSelectedYearRange() {
@@ -1664,10 +2022,6 @@ public class ChartsController {
             venueSearchField.setDisable(loading);
         }
 
-        if (searchButton != null) {
-            searchButton.setDisable(loading);
-        }
-
         if (addSelectedButton != null) {
             addSelectedButton.setDisable(loading);
         }
@@ -1747,6 +2101,22 @@ public class ChartsController {
         alert.showAndWait();
     }
 
+    private record ChartHighlightHandle(
+            String venueKey,
+            Runnable normalStyle,
+            Runnable highlightedStyle
+    ) {
+    }
+
+    private record LegendHighlightHandle(
+            String venueKey,
+            HBox legendItem,
+            Region colorDot,
+            Label nameLabel,
+            String color
+    ) {
+    }
+
     private record SelectedVenue(
             String type,
             Object venue
@@ -1756,6 +2126,7 @@ public class ChartsController {
     private record VenueChartSeries(
             String name,
             String type,
+            int venueId,
             List<Object> yearlyStats
     ) {
     }

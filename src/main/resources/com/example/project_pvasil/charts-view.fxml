@@ -64,7 +64,6 @@
                           alignment="TOP_CENTER"
                           maxWidth="1500">
 
-                        <!-- ================= HERO ================= -->
                         <VBox spacing="10"
                               styleClass="venue-hero-card"
                               maxWidth="1500">
@@ -77,7 +76,6 @@
                                    styleClass="venue-hero-subtitle"/>
                         </VBox>
 
-                        <!-- ================= FILTERS ================= -->
                         <VBox spacing="16"
                               styleClass="filter-card"
                               maxWidth="1500">
@@ -105,7 +103,7 @@
                                                promptText="Search journals or conferences"
                                                HBox.hgrow="ALWAYS"
                                                styleClass="google-search-input"/>
-                                    
+
                                     <ComboBox fx:id="venueTypeComboBox"
                                               promptText="Journal / Conference"
                                               prefWidth="190"
@@ -209,7 +207,6 @@
                             </HBox>
                         </VBox>
 
-                        <!-- ================= LINE CHART ================= -->
                         <VBox fx:id="lineChartPanel"
                               spacing="16"
                               styleClass="dashboard-panel charts-dashboard"
@@ -286,7 +283,6 @@
                             </VBox>
                         </VBox>
 
-                        <!-- ================= BAR CHARTS ================= -->
                         <VBox fx:id="barChartPanel"
                               spacing="16"
                               styleClass="dashboard-panel charts-dashboard"
@@ -302,7 +298,6 @@
                                     <Label text="Each comparison metric is displayed in a separate chart, so the results are easier to read."
                                            wrapText="true"
                                            maxWidth="Infinity"
-                                           minHeight="-Infinity"
                                            styleClass="stat-muted"/>
                                 </VBox>
 
@@ -445,7 +440,6 @@
                             </VBox>
                         </VBox>
 
-                        <!-- ================= SCATTER PLOT ================= -->
                         <VBox fx:id="scatterChartPanel"
                               spacing="16"
                               styleClass="dashboard-panel charts-dashboard"
@@ -455,10 +449,10 @@
 
                             <HBox alignment="CENTER_LEFT">
                                 <VBox spacing="4" HBox.hgrow="ALWAYS">
-                                    <Label text="Articles vs Average Authors Scatter Plot"
+                                    <Label text="Articles per Year vs Average Authors Scatter Plot"
                                            styleClass="content-title"/>
 
-                                    <Label text="Each selected journal or conference is displayed as a point, combining total publications and average author activity."
+                                    <Label text="For each selected journal or conference, every point represents one year. X-axis shows articles in that year and Y-axis shows average authors per article."
                                            wrapText="true"
                                            styleClass="stat-muted"/>
                                 </VBox>
@@ -485,7 +479,7 @@
 
                                     <xAxis>
                                         <NumberAxis fx:id="scatterArticlesAxis"
-                                                    label="Total articles"
+                                                    label="Articles / year"
                                                     forceZeroInRange="true"
                                                     minorTickVisible="false"
                                                     tickLabelsVisible="true"
@@ -494,7 +488,7 @@
 
                                     <yAxis>
                                         <NumberAxis fx:id="scatterAuthorsAxis"
-                                                    label="Avg author entries / year"
+                                                    label="Avg authors / article"
                                                     forceZeroInRange="true"
                                                     minorTickVisible="false"
                                                     tickLabelsVisible="true"
