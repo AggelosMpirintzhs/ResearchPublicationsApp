@@ -28,6 +28,10 @@ public class JournalService {
         this.journalRepository = new JournalRepository();
     }
 
+    public JournalService(JournalRepository journalRepository) {
+        this.journalRepository = journalRepository;
+    }
+
     public List<JournalSearchResultDto> searchJournals(String searchText, Integer limit) {
         String normalizedSearchText = normalizeSearchText(searchText);
 

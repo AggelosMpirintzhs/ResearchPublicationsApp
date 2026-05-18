@@ -10,18 +10,15 @@ SELECT
     title,
     year,
     article_type,
-
     journal_id,
     journal_name,
     source_id,
     volume,
     number,
-
     pages,
     ee,
     url,
     mdate,
-
     author_count,
     authors
 FROM vw_publication_report

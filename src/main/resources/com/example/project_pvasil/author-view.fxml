@@ -24,6 +24,7 @@
             fx:controller="controllers.AuthorController"
             styleClass="root-pane">
 
+    <!-- ================= TOP BAR ================= -->
     <top>
         <HBox spacing="16" alignment="CENTER_LEFT" styleClass="top-bar">
             <padding>
@@ -47,20 +48,26 @@
         </HBox>
     </top>
 
+    <!-- ================= CONTENT ================= -->
     <center>
         <ScrollPane fitToWidth="true"
+                    hbarPolicy="NEVER"
+                    pannable="true"
                     styleClass="page-scroll">
+
             <content>
-                <StackPane>
+                <StackPane alignment="TOP_CENTER">
                     <padding>
-                        <Insets top="28" right="42" bottom="44" left="42"/>
+                        <Insets top="24" right="24" bottom="40" left="24"/>
                     </padding>
 
                     <VBox spacing="22"
                           alignment="TOP_CENTER"
-                          maxWidth="1200">
+                          maxWidth="1500">
 
+                        <!-- ================= HERO ================= -->
                         <VBox spacing="10"
+                              maxWidth="1500"
                               styleClass="venue-hero-card">
 
                             <HBox alignment="CENTER_LEFT" spacing="14">
@@ -68,7 +75,7 @@
                                     <Label text="Authors"
                                            styleClass="venue-hero-title"/>
 
-                                    <Label text="Search and select an author to view profile statistics, yearly publication trends, and related publications."
+                                    <Label text="Search, select and explore an author profile with yearly publication trends and article details."
                                            styleClass="venue-hero-subtitle"
                                            wrapText="true"/>
                                 </VBox>
@@ -78,24 +85,24 @@
                             </HBox>
                         </VBox>
 
+                        <!-- ================= FILTERS ================= -->
                         <VBox spacing="16"
-                              styleClass="filter-card"
-                              maxWidth="1200">
+                              maxWidth="1500"
+                              styleClass="filter-card">
 
                             <VBox spacing="5">
-                                <Label text="Author Search"
+                                <Label text="Search Filters"
                                        styleClass="content-title"/>
 
-                                <Label text="Start typing at least 3 characters. Matching authors will appear automatically."
+                                <Label text="Search for an author and refine the profile using year filters."
                                        styleClass="stat-muted"
                                        wrapText="true"/>
                             </VBox>
 
-                            <HBox spacing="12" alignment="CENTER_LEFT" styleClass="form-row">
-                                <TextField fx:id="authorSearchField"
-                                           promptText="Search author, e.g. Mar"
-                                           prefWidth="360"
-                                           styleClass="form-control"/>
+                            <!-- Filters inside the same search/filter card -->
+                            <HBox spacing="12"
+                                  alignment="CENTER_LEFT"
+                                  styleClass="google-search-filters-row">
 
                                 <ComboBox fx:id="fromYearComboBox"
                                           promptText="From year"
@@ -119,40 +126,54 @@
                                         text="Load Profile"
                                         onAction="#loadAuthorProfile"
                                         styleClass="primary-button"/>
-
-                                <Button fx:id="clearButton"
-                                        text="Clear"
-                                        onAction="#clear"
-                                        styleClass="secondary-button"/>
                             </HBox>
 
-                            <VBox fx:id="authorResultsContainer"
-                                  spacing="10"
-                                  visible="false"
-                                  managed="false"
-                                  styleClass="venue-results-panel">
+                            <!-- Search bar with inline suggestions -->
+                            <VBox spacing="0"
+                                  styleClass="google-search-shell">
 
-                                <HBox alignment="CENTER_LEFT" spacing="10">
-                                    <VBox spacing="2" HBox.hgrow="ALWAYS">
-                                        <Label text="Matching authors"
-                                               styleClass="venue-results-title"/>
+                                <!-- Main search row -->
+                                <HBox spacing="10"
+                                      alignment="CENTER_LEFT"
+                                      styleClass="google-search-main-row">
 
-                                        <Label text="Select one author from the list."
-                                               styleClass="venue-results-subtitle"/>
-                                    </VBox>
+                                    <Label text="⌕"
+                                           styleClass="google-search-icon"/>
 
-                                    <Label text="LIVE SEARCH"
-                                           styleClass="small-blue-chip"/>
+                                    <TextField fx:id="authorSearchField"
+                                               promptText="Search authors"
+                                               HBox.hgrow="ALWAYS"
+                                               styleClass="google-search-input"/>
+
+                                    <Button fx:id="clearButton"
+                                            text="Clear"
+                                            onAction="#clear"
+                                            styleClass="google-secondary-button"/>
                                 </HBox>
 
-                                <ListView fx:id="authorResultsListView"
-                                          prefHeight="178"
-                                          minHeight="178"
-                                          maxHeight="178"
-                                          styleClass="venue-results-list"/>
+                                <!-- Matching results appear inside the search bar area -->
+                                <VBox fx:id="authorResultsContainer"
+                                      spacing="6"
+                                      visible="false"
+                                      managed="false"
+                                      styleClass="google-suggestions-panel">
+
+                                    <Label text="Suggested results"
+                                           styleClass="google-suggestions-header"/>
+
+                                    <ListView fx:id="authorResultsListView"
+                                              prefHeight="178"
+                                              minHeight="178"
+                                              maxHeight="178"
+                                              styleClass="google-suggestions-list"/>
+                                </VBox>
                             </VBox>
 
-                            <HBox spacing="10" alignment="CENTER_LEFT" styleClass="selected-strip">
+                            <!-- Selected author row -->
+                            <HBox spacing="10"
+                                  alignment="CENTER_LEFT"
+                                  styleClass="google-selected-row">
+
                                 <Label text="Selected"
                                        styleClass="selected-label"/>
 
@@ -167,9 +188,10 @@
                             </HBox>
                         </VBox>
 
+                        <!-- ================= AUTHOR PROFILE STATISTICS ================= -->
                         <VBox spacing="16"
                               styleClass="stats-panel"
-                              maxWidth="1200">
+                              maxWidth="1500">
 
                             <HBox alignment="CENTER_LEFT">
                                 <Label text="Author Profile Statistics"
@@ -258,9 +280,10 @@
                             </GridPane>
                         </VBox>
 
+                        <!-- ================= YEARLY CHARTS ================= -->
                         <VBox spacing="16"
                               styleClass="dashboard-panel charts-dashboard"
-                              maxWidth="1200">
+                              maxWidth="1500">
 
                             <HBox alignment="CENTER_LEFT">
                                 <VBox spacing="4" HBox.hgrow="ALWAYS">
@@ -282,7 +305,6 @@
 
                                 <VBox spacing="8"
                                       styleClass="chart-card"
-                                      prefWidth="570"
                                       HBox.hgrow="ALWAYS">
 
                                     <Label text="Published Articles"
@@ -290,7 +312,6 @@
 
                                     <LineChart fx:id="totalArticlesLineChart"
                                                title=""
-                                               prefWidth="540"
                                                prefHeight="280"
                                                minHeight="260"
                                                animated="false"
@@ -323,7 +344,6 @@
 
                                 <VBox spacing="8"
                                       styleClass="chart-card"
-                                      prefWidth="570"
                                       HBox.hgrow="ALWAYS">
 
                                     <Label text="Journal vs Conference Articles"
@@ -331,7 +351,6 @@
 
                                     <LineChart fx:id="publicationTypeLineChart"
                                                title=""
-                                               prefWidth="540"
                                                prefHeight="280"
                                                minHeight="260"
                                                animated="false"
@@ -365,10 +384,11 @@
                             </HBox>
                         </VBox>
 
+                        <!-- ================= PUBLICATION REPORT ================= -->
                         <VBox fx:id="publicationReportPanel"
                               spacing="12"
                               styleClass="dashboard-panel article-report-panel"
-                              maxWidth="1200"
+                              maxWidth="1500"
                               visible="false"
                               managed="false">
 

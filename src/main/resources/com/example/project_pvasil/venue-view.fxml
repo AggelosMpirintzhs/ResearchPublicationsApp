@@ -51,19 +51,23 @@
     <!-- ================= CONTENT ================= -->
     <center>
         <ScrollPane fitToWidth="true"
+                    hbarPolicy="NEVER"
+                    pannable="true"
                     styleClass="page-scroll">
+
             <content>
-                <StackPane>
+                <StackPane alignment="TOP_CENTER">
                     <padding>
-                        <Insets top="28" right="42" bottom="44" left="42"/>
+                        <Insets top="24" right="24" bottom="40" left="24"/>
                     </padding>
 
                     <VBox spacing="22"
                           alignment="TOP_CENTER"
-                          maxWidth="1200">
+                          maxWidth="1500">
 
                         <!-- ================= HERO ================= -->
                         <VBox spacing="10"
+                              maxWidth="1500"
                               styleClass="venue-hero-card">
 
                             <HBox alignment="CENTER_LEFT" spacing="14">
@@ -83,80 +87,23 @@
 
                         <!-- ================= FILTERS ================= -->
                         <VBox spacing="16"
-                              styleClass="filter-card"
-                              maxWidth="1200">
+                              maxWidth="1500"
+                              styleClass="filter-card">
 
                             <VBox spacing="5">
                                 <Label text="Search Filters"
                                        styleClass="content-title"/>
 
-                                <Label text="Choose Journal or Conference, search by name/acronym, select one result from the list, and optionally restrict results to a year range."
+                                <Label text="Search for a journal or conference and refine the profile using year filters."
                                        styleClass="stat-muted"
                                        wrapText="true"/>
                             </VBox>
 
-                            <!-- Search row -->
-                            <HBox spacing="12" alignment="CENTER_LEFT" styleClass="form-row">
-                                <ComboBox fx:id="venueTypeComboBox"
-                                          promptText="Journal / Conference"
-                                          prefWidth="205"
-                                          styleClass="form-control"/>
+                            <!-- Filters inside the same search/filter card -->
+                            <HBox spacing="12"
+                                  alignment="CENTER_LEFT"
+                                  styleClass="google-search-filters-row">
 
-                                <TextField fx:id="venueSearchField"
-                                           promptText="Search venue"
-                                           prefWidth="340"
-                                           styleClass="form-control"/>
-
-                                <Button fx:id="searchVenueButton"
-                                        text="Search"
-                                        onAction="#searchVenues"
-                                        styleClass="primary-button"/>
-
-                                <Button fx:id="clearButton"
-                                        text="Clear"
-                                        onAction="#clear"
-                                        styleClass="secondary-button"/>
-                            </HBox>
-
-                            <!-- Results panel - hidden before search -->
-                            <VBox fx:id="venueResultsContainer"
-                                  spacing="10"
-                                  visible="false"
-                                  managed="false"
-                                  styleClass="venue-results-panel">
-
-                                <HBox alignment="CENTER_LEFT" spacing="10">
-                                    <VBox spacing="2" HBox.hgrow="ALWAYS">
-                                        <Label text="Matching results"
-                                               styleClass="venue-results-title"/>
-
-                                        <Label text="Select one journal or conference from the list."
-                                               styleClass="venue-results-subtitle"/>
-                                    </VBox>
-
-                                    <Label text="SCROLL"
-                                           styleClass="small-blue-chip"/>
-                                </HBox>
-
-                                <ListView fx:id="venueResultsListView"
-                                          prefHeight="178"
-                                          minHeight="178"
-                                          maxHeight="178"
-                                          styleClass="venue-results-list"/>
-                            </VBox>
-
-                            <!-- Selected venue row -->
-                            <HBox spacing="10" alignment="CENTER_LEFT" styleClass="selected-strip">
-                                <Label text="Selected"
-                                       styleClass="selected-label"/>
-
-                                <Label fx:id="selectedVenueLabel"
-                                       text="No venue selected"
-                                       styleClass="selected-value"/>
-                            </HBox>
-
-                            <!-- Year filters row -->
-                            <HBox spacing="12" alignment="CENTER_LEFT" styleClass="form-row">
                                 <ComboBox fx:id="fromYearComboBox"
                                           promptText="From year"
                                           prefWidth="155"
@@ -179,15 +126,71 @@
                                         text="Load Profile"
                                         onAction="#loadVenueProfile"
                                         styleClass="primary-button"/>
+                            </HBox>
 
-                                <Label text="To year must be ≥ From year"
-                                       styleClass="hint-label"/>
+                            <!-- Search bar with inline suggestions -->
+                            <VBox spacing="0"
+                                  styleClass="google-search-shell">
+
+                                <!-- Main search row -->
+                                <HBox spacing="10"
+                                      alignment="CENTER_LEFT"
+                                      styleClass="google-search-main-row">
+
+                                    <Label text="⌕"
+                                           styleClass="google-search-icon"/>
+
+                                    <TextField fx:id="venueSearchField"
+                                               promptText="Search journals or conferences"
+                                               HBox.hgrow="ALWAYS"
+                                               styleClass="google-search-input"/>
+
+                                    <ComboBox fx:id="venueTypeComboBox"
+                                              promptText="Journal / Conference"
+                                              prefWidth="190"
+                                              styleClass="google-search-combo"/>
+
+                                    <Button fx:id="clearButton"
+                                            text="Clear"
+                                            onAction="#clear"
+                                            styleClass="google-secondary-button"/>
+                                </HBox>
+
+                                <!-- Matching results appear inside the search bar area -->
+                                <VBox fx:id="venueResultsContainer"
+                                      spacing="6"
+                                      visible="false"
+                                      managed="false"
+                                      styleClass="google-suggestions-panel">
+
+                                    <Label text="Suggested results"
+                                           styleClass="google-suggestions-header"/>
+
+                                    <ListView fx:id="venueResultsListView"
+                                              prefHeight="178"
+                                              minHeight="178"
+                                              maxHeight="178"
+                                              styleClass="google-suggestions-list"/>
+                                </VBox>
+                            </VBox>
+
+                            <!-- Selected venue row -->
+                            <HBox spacing="10"
+                                  alignment="CENTER_LEFT"
+                                  styleClass="google-selected-row">
+
+                                <Label text="Selected"
+                                       styleClass="selected-label"/>
+
+                                <Label fx:id="selectedVenueLabel"
+                                       text="No venue selected"
+                                       styleClass="selected-value"/>
                             </HBox>
                         </VBox>
 
                         <!-- ================= RANKING + STATISTICS ================= -->
                         <HBox spacing="20"
-                              maxWidth="1200">
+                              maxWidth="1500">
 
                             <!-- Ranking -->
                             <VBox spacing="18"
@@ -310,13 +313,12 @@
 
                                 </GridPane>
                             </VBox>
-
                         </HBox>
 
                         <!-- ================= YEARLY CHARTS ================= -->
                         <VBox spacing="16"
                               styleClass="dashboard-panel charts-dashboard"
-                              maxWidth="1200">
+                              maxWidth="1500">
 
                             <HBox alignment="CENTER_LEFT">
                                 <VBox spacing="4" HBox.hgrow="ALWAYS">
@@ -339,7 +341,6 @@
                                 <!-- Articles chart -->
                                 <VBox spacing="8"
                                       styleClass="chart-card"
-                                      prefWidth="370"
                                       HBox.hgrow="ALWAYS">
 
                                     <Label text="Published Articles"
@@ -347,7 +348,6 @@
 
                                     <LineChart fx:id="articlesLineChart"
                                                title=""
-                                               prefWidth="350"
                                                prefHeight="260"
                                                minHeight="250"
                                                animated="false"
@@ -381,7 +381,6 @@
                                 <!-- Author entries chart -->
                                 <VBox spacing="8"
                                       styleClass="chart-card"
-                                      prefWidth="370"
                                       HBox.hgrow="ALWAYS">
 
                                     <Label text="Total Author Entries"
@@ -389,7 +388,6 @@
 
                                     <LineChart fx:id="authorEntriesLineChart"
                                                title=""
-                                               prefWidth="350"
                                                prefHeight="260"
                                                minHeight="250"
                                                animated="false"
@@ -423,7 +421,6 @@
                                 <!-- Distinct authors chart -->
                                 <VBox spacing="8"
                                       styleClass="chart-card"
-                                      prefWidth="370"
                                       HBox.hgrow="ALWAYS">
 
                                     <Label text="Distinct Authors"
@@ -431,7 +428,6 @@
 
                                     <LineChart fx:id="distinctAuthorsLineChart"
                                                title=""
-                                               prefWidth="350"
                                                prefHeight="260"
                                                minHeight="250"
                                                animated="false"
@@ -467,9 +463,9 @@
 
                         <!-- ================= ARTICLE REPORT ================= -->
                         <VBox fx:id="articleReportPanel"
-                              spacing="12"
+                              spacing="14"
                               styleClass="dashboard-panel article-report-panel"
-                              maxWidth="1200"
+                              maxWidth="1500"
                               visible="false"
                               managed="false">
 
@@ -492,31 +488,42 @@
                             </HBox>
 
                             <TableView fx:id="articlesTable"
-                                       prefHeight="350"
-                                       minHeight="350"
-                                       maxHeight="350"
-                                       fixedCellSize="34"
+                                       prefHeight="430"
+                                       minHeight="430"
+                                       maxHeight="430"
+                                       maxWidth="1500"
+                                       fixedCellSize="36"
                                        styleClass="articles-scroll-table">
+
+                                <columnResizePolicy>
+                                    <TableView fx:constant="CONSTRAINED_RESIZE_POLICY"/>
+                                </columnResizePolicy>
+
                                 <columns>
                                     <TableColumn fx:id="yearColumn"
                                                  text="Year"
+                                                 minWidth="70"
                                                  prefWidth="80"/>
 
                                     <TableColumn fx:id="titleColumn"
                                                  text="Title"
-                                                 prefWidth="430"/>
+                                                 minWidth="450"
+                                                 prefWidth="620"/>
 
                                     <TableColumn fx:id="authorsColumn"
                                                  text="Authors"
-                                                 prefWidth="330"/>
+                                                 minWidth="360"
+                                                 prefWidth="500"/>
 
                                     <TableColumn fx:id="pagesColumn"
                                                  text="Pages"
-                                                 prefWidth="100"/>
+                                                 minWidth="80"
+                                                 prefWidth="95"/>
 
                                     <TableColumn fx:id="urlColumn"
                                                  text="URL / EE"
-                                                 prefWidth="180"/>
+                                                 minWidth="360"
+                                                 prefWidth="520"/>
                                 </columns>
                             </TableView>
                         </VBox>

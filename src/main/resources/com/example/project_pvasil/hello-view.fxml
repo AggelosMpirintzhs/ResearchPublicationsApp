@@ -44,12 +44,12 @@
           </padding>
 
           <VBox spacing="26"
-                maxWidth="1080"
+                maxWidth="1500"
                 alignment="TOP_CENTER">
 
             <!-- ================= INTRO DESCRIPTION ================= -->
             <VBox spacing="10"
-                  maxWidth="1080"
+                  maxWidth="1500"
                   alignment="CENTER_LEFT"
                   styleClass="simple-home-hero">
 
@@ -74,7 +74,7 @@
             <!-- ================= CARDS ================= -->
             <GridPane hgap="20"
                       vgap="20"
-                      maxWidth="1080"
+                      maxWidth="1500"
                       alignment="CENTER">
 
               <columnConstraints>

@@ -28,6 +28,10 @@ public class ConferenceService {
         this.conferenceRepository = new ConferenceRepository();
     }
 
+    public ConferenceService(ConferenceRepository conferenceRepository) {
+        this.conferenceRepository = conferenceRepository;
+    }
+
     public List<ConferenceSearchResultDto> searchConferences(String searchText, Integer limit) {
         String normalizedSearchText = normalizeSearchText(searchText);
 

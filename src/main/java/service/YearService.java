@@ -8,23 +8,26 @@ import repository.YearRepository;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.BooleanSupplier;
+import java.util.function.Consumer;
 
 public class YearService {
 
-    private static final String DEFAULT_PUBLICATION_TYPE = "ALL";
+    public static final String PUBLICATION_TYPE_ALL = "ALL";
+    public static final String PUBLICATION_TYPE_JOURNAL = "JOURNAL";
+    public static final String PUBLICATION_TYPE_CONFERENCE = "CONFERENCE";
+
+    private static final String DEFAULT_PUBLICATION_TYPE = PUBLICATION_TYPE_ALL;
 
     private static final int DEFAULT_FILTER_ID = 0;
-
     private static final int DEFAULT_LAST_ARTICLE_ID = 0;
-
     private static final int DEFAULT_BATCH_SIZE = 1000;
-
     private static final int MAX_BATCH_SIZE = 5000;
 
     private static final Set<String> ALLOWED_PUBLICATION_TYPES = Set.of(
-            "ALL",
-            "JOURNAL",
-            "CONFERENCE"
+            PUBLICATION_TYPE_ALL,
+            PUBLICATION_TYPE_JOURNAL,
+            PUBLICATION_TYPE_CONFERENCE
     );
 
     private final YearRepository yearRepository;
@@ -33,14 +36,156 @@ public class YearService {
         this.yearRepository = new YearRepository();
     }
 
+    public YearService(YearRepository yearRepository) {
+        this.yearRepository = yearRepository;
+    }
+
     public List<AvailableYearDto> getAvailableYears() {
         return yearRepository.findAvailableYears();
+    }
+
+    public YearPageData loadYearPageData(
+            int year,
+            String publicationType
+    ) {
+        validateYear(year);
+
+        String safePublicationType = normalizePublicationType(publicationType);
+
+        Optional<YearProfileDto> profile = yearRepository.findYearProfile(year);
+
+        YearProfileDto profileDto = profile.orElse(null);
+
+        long expectedPublicationCount =
+                getExpectedPublicationCount(profileDto, safePublicationType);
+
+        return new YearPageData(
+                year,
+                safePublicationType,
+                profileDto,
+                expectedPublicationCount
+        );
     }
 
     public Optional<YearProfileDto> getYearProfile(int year) {
         validateYear(year);
 
         return yearRepository.findYearProfile(year);
+    }
+
+    public long getExpectedPublicationCount(
+            AvailableYearDto yearDto,
+            String publicationType
+    ) {
+        if (yearDto == null) {
+            return 0L;
+        }
+
+        String safePublicationType = normalizePublicationType(publicationType);
+
+        if (PUBLICATION_TYPE_JOURNAL.equals(safePublicationType)) {
+            return nullToZero(yearDto.totalJournalArticles());
+        }
+
+        if (PUBLICATION_TYPE_CONFERENCE.equals(safePublicationType)) {
+            return nullToZero(yearDto.totalConferenceArticles());
+        }
+
+        return nullToZero(yearDto.totalArticles());
+    }
+
+    public long getExpectedPublicationCount(
+            YearProfileDto profile,
+            String publicationType
+    ) {
+        if (profile == null) {
+            return 0L;
+        }
+
+        String safePublicationType = normalizePublicationType(publicationType);
+
+        if (PUBLICATION_TYPE_JOURNAL.equals(safePublicationType)) {
+            return nullToZero(profile.totalJournalArticles());
+        }
+
+        if (PUBLICATION_TYPE_CONFERENCE.equals(safePublicationType)) {
+            return nullToZero(profile.totalConferenceArticles());
+        }
+
+        return nullToZero(profile.totalArticles());
+    }
+
+    public void loadYearPublicationsInBatches(
+            int year,
+            String publicationType,
+            Integer journalId,
+            Integer conferenceId,
+            Integer authorId,
+            Integer lastArticleId,
+            Integer initialBatchSize,
+            Integer regularBatchSize,
+            Consumer<List<YearPublicationDto>> onBatchLoaded,
+            BooleanSupplier shouldContinue
+    ) {
+        validateYear(year);
+
+        if (onBatchLoaded == null) {
+            throw new IllegalArgumentException("Το onBatchLoaded δεν μπορεί να είναι null.");
+        }
+
+        if (shouldContinue == null) {
+            throw new IllegalArgumentException("Το shouldContinue δεν μπορεί να είναι null.");
+        }
+
+        String safePublicationType = normalizePublicationType(publicationType);
+
+        int safeJournalId = normalizeFilterId(journalId, "journalId");
+        int safeConferenceId = normalizeFilterId(conferenceId, "conferenceId");
+        int safeAuthorId = normalizeFilterId(authorId, "authorId");
+
+        int safeLastArticleId = normalizeLastArticleId(lastArticleId);
+        int safeInitialBatchSize = normalizeBatchSize(initialBatchSize);
+        int safeRegularBatchSize = normalizeBatchSize(regularBatchSize);
+
+        validateFilterCombination(
+                safePublicationType,
+                safeJournalId,
+                safeConferenceId
+        );
+
+        boolean firstBatch = true;
+
+        while (shouldContinue.getAsBoolean()) {
+            int currentBatchSize = firstBatch
+                    ? safeInitialBatchSize
+                    : safeRegularBatchSize;
+
+            List<YearPublicationDto> batch =
+                    yearRepository.findYearPublicationsBatch(
+                            year,
+                            safePublicationType,
+                            safeJournalId,
+                            safeConferenceId,
+                            safeAuthorId,
+                            safeLastArticleId,
+                            currentBatchSize
+                    );
+
+            if (batch.isEmpty()) {
+                break;
+            }
+
+            onBatchLoaded.accept(batch);
+
+            YearPublicationDto lastPublication = batch.get(batch.size() - 1);
+
+            if (lastPublication.articleId() == null) {
+                break;
+            }
+
+            safeLastArticleId = lastPublication.articleId();
+            firstBatch = false;
+        }
     }
 
     public List<YearPublicationDto> getYearPublications(
@@ -113,7 +258,7 @@ public class YearService {
     public List<YearPublicationDto> getAllYearPublications(int year) {
         return getYearPublications(
                 year,
-                "ALL",
+                PUBLICATION_TYPE_ALL,
                 DEFAULT_FILTER_ID,
                 DEFAULT_FILTER_ID,
                 DEFAULT_FILTER_ID
@@ -123,7 +268,7 @@ public class YearService {
     public List<YearPublicationDto> getYearJournalPublications(int year) {
         return getYearPublications(
                 year,
-                "JOURNAL",
+                PUBLICATION_TYPE_JOURNAL,
                 DEFAULT_FILTER_ID,
                 DEFAULT_FILTER_ID,
                 DEFAULT_FILTER_ID
@@ -133,7 +278,7 @@ public class YearService {
     public List<YearPublicationDto> getYearConferencePublications(int year) {
         return getYearPublications(
                 year,
-                "CONFERENCE",
+                PUBLICATION_TYPE_CONFERENCE,
                 DEFAULT_FILTER_ID,
                 DEFAULT_FILTER_ID,
                 DEFAULT_FILTER_ID
@@ -146,7 +291,7 @@ public class YearService {
     ) {
         return getYearPublications(
                 year,
-                "JOURNAL",
+                PUBLICATION_TYPE_JOURNAL,
                 journalId,
                 DEFAULT_FILTER_ID,
                 DEFAULT_FILTER_ID
@@ -159,7 +304,7 @@ public class YearService {
     ) {
         return getYearPublications(
                 year,
-                "CONFERENCE",
+                PUBLICATION_TYPE_CONFERENCE,
                 DEFAULT_FILTER_ID,
                 conferenceId,
                 DEFAULT_FILTER_ID
@@ -172,7 +317,7 @@ public class YearService {
     ) {
         return getYearPublications(
                 year,
-                "ALL",
+                PUBLICATION_TYPE_ALL,
                 DEFAULT_FILTER_ID,
                 DEFAULT_FILTER_ID,
                 authorId
@@ -186,7 +331,7 @@ public class YearService {
     ) {
         return getYearPublicationsBatch(
                 year,
-                "ALL",
+                PUBLICATION_TYPE_ALL,
                 DEFAULT_FILTER_ID,
                 DEFAULT_FILTER_ID,
                 DEFAULT_FILTER_ID,
@@ -202,7 +347,7 @@ public class YearService {
     ) {
         return getYearPublicationsBatch(
                 year,
-                "JOURNAL",
+                PUBLICATION_TYPE_JOURNAL,
                 DEFAULT_FILTER_ID,
                 DEFAULT_FILTER_ID,
                 DEFAULT_FILTER_ID,
@@ -218,7 +363,7 @@ public class YearService {
     ) {
         return getYearPublicationsBatch(
                 year,
-                "CONFERENCE",
+                PUBLICATION_TYPE_CONFERENCE,
                 DEFAULT_FILTER_ID,
                 DEFAULT_FILTER_ID,
                 DEFAULT_FILTER_ID,
@@ -235,7 +380,7 @@ public class YearService {
     ) {
         return getYearPublicationsBatch(
                 year,
-                "JOURNAL",
+                PUBLICATION_TYPE_JOURNAL,
                 journalId,
                 DEFAULT_FILTER_ID,
                 DEFAULT_FILTER_ID,
@@ -252,7 +397,7 @@ public class YearService {
     ) {
         return getYearPublicationsBatch(
                 year,
-                "CONFERENCE",
+                PUBLICATION_TYPE_CONFERENCE,
                 DEFAULT_FILTER_ID,
                 conferenceId,
                 DEFAULT_FILTER_ID,
@@ -269,7 +414,7 @@ public class YearService {
     ) {
         return getYearPublicationsBatch(
                 year,
-                "ALL",
+                PUBLICATION_TYPE_ALL,
                 DEFAULT_FILTER_ID,
                 DEFAULT_FILTER_ID,
                 authorId,
@@ -329,11 +474,7 @@ public class YearService {
             return DEFAULT_BATCH_SIZE;
         }
 
-        if (batchSize > MAX_BATCH_SIZE) {
-            return MAX_BATCH_SIZE;
-        }
-
-        return batchSize;
+        return Math.min(batchSize, MAX_BATCH_SIZE);
     }
 
     private void validateFilterCombination(
@@ -347,16 +488,31 @@ public class YearService {
             );
         }
 
-        if (journalId > 0 && publicationType.equals("CONFERENCE")) {
+        if (journalId > 0 && publicationType.equals(PUBLICATION_TYPE_CONFERENCE)) {
             throw new IllegalArgumentException(
                     "Δεν μπορείς να έχεις publicationType = CONFERENCE και journalId φίλτρο."
             );
         }
 
-        if (conferenceId > 0 && publicationType.equals("JOURNAL")) {
+        if (conferenceId > 0 && publicationType.equals(PUBLICATION_TYPE_JOURNAL)) {
             throw new IllegalArgumentException(
                     "Δεν μπορείς να έχεις publicationType = JOURNAL και conferenceId φίλτρο."
             );
+        }
+    }
+
+    private long nullToZero(Long value) {
+        return value == null ? 0L : value;
+    }
+
+    public record YearPageData(
+            int year,
+            String publicationType,
+            YearProfileDto profile,
+            long expectedPublicationCount
+    ) {
+        public boolean hasProfile() {
+            return profile != null;
         }
     }
 }

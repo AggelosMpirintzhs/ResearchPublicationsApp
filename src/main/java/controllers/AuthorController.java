@@ -32,14 +32,12 @@ import javafx.scene.control.TextField;
 import javafx.scene.layout.VBox;
 import javafx.util.Duration;
 import service.AuthorService;
+import util.TableCopySupport;
 
 import java.io.IOException;
-import java.text.Normalizer;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
-import java.util.Optional;
 
 public class AuthorController {
 
@@ -238,7 +236,6 @@ public class AuthorController {
             }
 
             List<AuthorSearchResultDto> results = authorSearchTask.getValue();
-            results = sortAuthorsByRelevance(results, requestedSearchText);
 
             authorSearchItems.setAll(results);
             setAuthorResultsVisible(true);
@@ -388,6 +385,8 @@ public class AuthorController {
             publicationsTable.setMinHeight(350);
             publicationsTable.setMaxHeight(350);
             publicationsTable.setFixedCellSize(34);
+
+            TableCopySupport.enableCellCopy(publicationsTable);
         }
 
         if (publicationYearColumn != null) {
@@ -400,39 +399,45 @@ public class AuthorController {
             publicationTypeColumn.setCellValueFactory(cellData ->
                     new SimpleStringProperty(nullToDash(cellData.getValue().articleType()))
             );
+            TableCopySupport.makeStringColumnTextSelectable(publicationTypeColumn);
         }
 
         if (publicationTitleColumn != null) {
             publicationTitleColumn.setCellValueFactory(cellData ->
                     new SimpleStringProperty(nullToDash(cellData.getValue().title()))
             );
+            TableCopySupport.makeStringColumnTextSelectable(publicationTitleColumn);
         }
 
         if (publicationVenueColumn != null) {
             publicationVenueColumn.setCellValueFactory(cellData ->
                     new SimpleStringProperty(buildVenueDisplayName(cellData.getValue()))
             );
+            TableCopySupport.makeStringColumnTextSelectable(publicationVenueColumn);
         }
 
         if (publicationAuthorsColumn != null) {
             publicationAuthorsColumn.setCellValueFactory(cellData ->
                     new SimpleStringProperty(nullToDash(cellData.getValue().authors()))
             );
+            TableCopySupport.makeStringColumnTextSelectable(publicationAuthorsColumn);
         }
 
         if (publicationPagesColumn != null) {
             publicationPagesColumn.setCellValueFactory(cellData ->
                     new SimpleStringProperty(nullToDash(cellData.getValue().pages()))
             );
+            TableCopySupport.makeStringColumnTextSelectable(publicationPagesColumn);
         }
 
         if (publicationUrlColumn != null) {
             publicationUrlColumn.setCellValueFactory(cellData ->
                     new SimpleStringProperty(nullToDash(firstNonBlank(
-                            cellData.getValue().url(),
-                            cellData.getValue().ee()
+                            cellData.getValue().ee(),
+                            cellData.getValue().url()
                     )))
             );
+            TableCopySupport.makeStringColumnTextSelectable(publicationUrlColumn);
         }
     }
 
@@ -462,34 +467,13 @@ public class AuthorController {
         boolean shouldLoadPublications =
                 loadPublicationsCheckBox != null && loadPublicationsCheckBox.isSelected();
 
-        Task<AuthorPageData> task = new Task<>() {
+        Task<AuthorService.AuthorPageData> task = new Task<>() {
             @Override
-            protected AuthorPageData call() {
-                Optional<AuthorProfileDto> profile =
-                        authorService.getAuthorProfile(
-                                authorId,
-                                yearRange.startYear(),
-                                yearRange.endYear()
-                        );
-
-                List<AuthorYearlyStatsDto> yearlyStats =
-                        authorService.getAuthorYearlyStats(
-                                authorId,
-                                yearRange.startYear(),
-                                yearRange.endYear()
-                        );
-
-                List<AuthorYearlyStatsByTypeDto> yearlyStatsByType =
-                        authorService.getAuthorYearlyStatsByType(
-                                authorId,
-                                yearRange.startYear(),
-                                yearRange.endYear()
-                        );
-
-                return new AuthorPageData(
-                        profile.orElse(null),
-                        yearlyStats,
-                        yearlyStatsByType
+            protected AuthorService.AuthorPageData call() {
+                return authorService.loadAuthorPageData(
+                        authorId,
+                        yearRange.startYear(),
+                        yearRange.endYear()
                 );
             }
         };
@@ -499,9 +483,9 @@ public class AuthorController {
         task.setOnSucceeded(event -> {
             setLoading(false);
 
-            AuthorPageData data = task.getValue();
+            AuthorService.AuthorPageData data = task.getValue();
 
-            if (data.profile() == null) {
+            if (!data.hasProfile()) {
                 clearResultArea();
                 showInfo(
                         "Δεν βρέθηκαν δεδομένα",
@@ -514,7 +498,7 @@ public class AuthorController {
             updateTotalArticlesChart(data.yearlyStats());
             updatePublicationTypeChart(data.yearlyStatsByType());
 
-            expectedPublicationCount = nullToZero(data.profile().totalArticles());
+            expectedPublicationCount = data.expectedPublicationCount();
 
             if (shouldLoadPublications) {
                 publicationItems.clear();
@@ -558,38 +542,21 @@ public class AuthorController {
         publicationLoadingTask = new Task<>() {
             @Override
             protected Void call() {
-                int lastArticleId = 0;
-
-                while (!stopPublicationLoading && !isCancelled()) {
-                    List<AuthorPublicationDto> batch =
-                            authorService.getAuthorPublicationsBatch(
-                                    authorId,
-                                    startYear,
-                                    endYear,
-                                    lastArticleId,
-                                    PUBLICATION_BATCH_SIZE
+                authorService.loadAuthorPublicationsInBatches(
+                        authorId,
+                        startYear,
+                        endYear,
+                        0,
+                        PUBLICATION_BATCH_SIZE,
+                        batch -> Platform.runLater(() -> {
+                            publicationItems.addAll(batch);
+                            updatePublicationsLoadedLabel(
+                                    publicationItems.size(),
+                                    expectedPublicationCount
                             );
-
-                    if (batch.isEmpty()) {
-                        break;
-                    }
-
-                    AuthorPublicationDto lastPublication = batch.get(batch.size() - 1);
-
-                    if (lastPublication.articleId() == null) {
-                        break;
-                    }
-
-                    lastArticleId = lastPublication.articleId();
-
-                    Platform.runLater(() -> {
-                        publicationItems.addAll(batch);
-                        updatePublicationsLoadedLabel(
-                                publicationItems.size(),
-                                expectedPublicationCount
-                        );
-                    });
-                }
+                        }),
+                        () -> !stopPublicationLoading && !isCancelled()
+                );
 
                 Platform.runLater(() ->
                         updatePublicationsLoadedLabel(
@@ -698,7 +665,7 @@ public class AuthorController {
 
         Integer minYear = null;
         Integer maxYear = null;
-        long maxArticles = 0;
+        double maxArticles = 0;
 
         XYChart.Series<Number, Number> series = new XYChart.Series<>();
         series.setName("Total articles");
@@ -737,7 +704,7 @@ public class AuthorController {
 
         Integer minYear = null;
         Integer maxYear = null;
-        long maxValue = 0;
+        double maxValue = 0;
 
         XYChart.Series<Number, Number> journalSeries = new XYChart.Series<>();
         journalSeries.setName("Journal articles");
@@ -834,7 +801,7 @@ public class AuthorController {
         return 20;
     }
 
-    private void configureValueAxis(NumberAxis axis, long maxValue) {
+    private void configureValueAxis(NumberAxis axis, double maxValue) {
         if (axis == null) {
             return;
         }
@@ -849,65 +816,50 @@ public class AuthorController {
         axis.setMinorTickVisible(false);
     }
 
-    private double calculateNiceUpperBound(long maxValue) {
+    private double calculateNiceUpperBound(double maxValue) {
         if (maxValue <= 0) {
             return 10;
         }
 
-        double paddedValue = maxValue * 1.15;
+        double paddedValue = maxValue * 1.08;
+        double roughTickUnit = paddedValue / 7.0;
+        double tickUnit = calculateNiceRawTickUnit(roughTickUnit);
 
-        if (paddedValue <= 10) {
-            return Math.ceil(paddedValue);
-        }
-
-        double magnitude = Math.pow(10, Math.floor(Math.log10(paddedValue)));
-        double normalized = paddedValue / magnitude;
-
-        double rounded;
-
-        if (normalized <= 1) {
-            rounded = 1;
-        } else if (normalized <= 2) {
-            rounded = 2;
-        } else if (normalized <= 5) {
-            rounded = 5;
-        } else {
-            rounded = 10;
-        }
-
-        return rounded * magnitude;
+        return Math.ceil(paddedValue / tickUnit) * tickUnit;
     }
 
     private double calculateNiceTickUnit(double upperBound) {
-        if (upperBound <= 10) {
+        if (upperBound <= 0) {
             return 1;
         }
 
-        if (upperBound <= 20) {
-            return 2;
+        double roughTickUnit = upperBound / 7.0;
+        return calculateNiceRawTickUnit(roughTickUnit);
+    }
+
+    private double calculateNiceRawTickUnit(double value) {
+        if (value <= 0) {
+            return 1;
         }
 
-        if (upperBound <= 50) {
-            return 5;
+        double magnitude = Math.pow(10, Math.floor(Math.log10(value)));
+        double normalized = value / magnitude;
+
+        double niceNormalized;
+
+        if (normalized <= 1) {
+            niceNormalized = 1;
+        } else if (normalized <= 2) {
+            niceNormalized = 2;
+        } else if (normalized <= 2.5) {
+            niceNormalized = 2.5;
+        } else if (normalized <= 5) {
+            niceNormalized = 5;
+        } else {
+            niceNormalized = 10;
         }
 
-        if (upperBound <= 100) {
-            return 10;
-        }
-
-        if (upperBound <= 500) {
-            return 50;
-        }
-
-        if (upperBound <= 1000) {
-            return 100;
-        }
-
-        if (upperBound <= 5000) {
-            return 500;
-        }
-
-        return Math.ceil(upperBound / 10.0);
+        return niceNormalized * magnitude;
     }
 
     private void clearResultArea() {
@@ -1027,92 +979,6 @@ public class AuthorController {
         return "-";
     }
 
-    private List<AuthorSearchResultDto> sortAuthorsByRelevance(
-            List<AuthorSearchResultDto> results,
-            String query
-    ) {
-        if (results == null || results.isEmpty()) {
-            return new ArrayList<>();
-        }
-
-        String normalizedQuery = normalizeSearchText(query);
-        List<AuthorSearchResultDto> sortedResults = new ArrayList<>(results);
-
-        sortedResults.sort((first, second) -> {
-            int firstScore = authorRelevanceScore(first, normalizedQuery);
-            int secondScore = authorRelevanceScore(second, normalizedQuery);
-
-            if (firstScore != secondScore) {
-                return Integer.compare(firstScore, secondScore);
-            }
-
-            String firstName = normalizeSearchText(first.authorName());
-            String secondName = normalizeSearchText(second.authorName());
-
-            if (firstName.length() != secondName.length()) {
-                return Integer.compare(firstName.length(), secondName.length());
-            }
-
-            return firstName.compareTo(secondName);
-        });
-
-        return sortedResults;
-    }
-
-    private int authorRelevanceScore(AuthorSearchResultDto author, String query) {
-        String name = normalizeSearchText(author == null ? null : author.authorName());
-
-        if (name.equals(query)) {
-            return 0;
-        }
-
-        if (name.startsWith(query)) {
-            return 1;
-        }
-
-        if (name.contains(" " + query)) {
-            return 2;
-        }
-
-        if (name.contains(query)) {
-            return 3;
-        }
-
-        if (containsAllQueryWords(name, query)) {
-            return 4;
-        }
-
-        return 5;
-    }
-
-    private boolean containsAllQueryWords(String text, String query) {
-        if (query == null || query.isBlank()) {
-            return true;
-        }
-
-        for (String word : query.split(" ")) {
-            if (!word.isBlank() && !text.contains(word)) {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    private String normalizeSearchText(String text) {
-        if (text == null) {
-            return "";
-        }
-
-        String normalized = Normalizer.normalize(text, Normalizer.Form.NFD)
-                .replaceAll("\\p{M}", "");
-
-        return normalized.toLowerCase(Locale.ROOT)
-                .trim()
-                .replaceAll("[^\\p{L}\\p{Nd}]+", " ")
-                .replaceAll("\\s+", " ");
-    }
-
     private String firstNonBlank(String first, String second) {
         if (first != null && !first.isBlank()) {
             return first;
@@ -1218,13 +1084,6 @@ public class AuthorController {
     private record YearRange(
             Integer startYear,
             Integer endYear
-    ) {
-    }
-
-    private record AuthorPageData(
-            AuthorProfileDto profile,
-            List<AuthorYearlyStatsDto> yearlyStats,
-            List<AuthorYearlyStatsByTypeDto> yearlyStatsByType
     ) {
     }
 }

@@ -4,13 +4,19 @@ import dto.conference.ConferenceSearchResultDto;
 import dto.conference.ConferenceYearlyStatsDto;
 import dto.journal.JournalSearchResultDto;
 import dto.journal.JournalYearlyStatsDto;
+import javafx.animation.PauseTransition;
+import javafx.application.Platform;
 import javafx.concurrent.Task;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
+import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.Parent;
+import javafx.scene.chart.BarChart;
+import javafx.scene.chart.CategoryAxis;
 import javafx.scene.chart.LineChart;
 import javafx.scene.chart.NumberAxis;
+import javafx.scene.chart.ScatterChart;
 import javafx.scene.chart.XYChart;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
@@ -19,7 +25,13 @@ import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
 import javafx.scene.control.TextField;
+import javafx.scene.control.Tooltip;
+import javafx.scene.input.MouseButton;
+import javafx.scene.layout.FlowPane;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
+import javafx.util.Duration;
 import service.ConferenceService;
 import service.JournalService;
 
@@ -41,14 +53,40 @@ public class ChartsController {
     private static final String METRIC_AUTHOR_ENTRIES = "Total author entries";
     private static final String METRIC_DISTINCT_AUTHORS = "Distinct authors";
 
+    private static final String BAR_TOTAL_ARTICLES = "Total articles";
+    private static final String BAR_AVG_ARTICLES_PER_YEAR = "Avg articles / year";
+    private static final String BAR_AVG_AUTHOR_ENTRIES_PER_YEAR = "Avg author entries / year";
+
+    private static final String BAR_SINGLE_CATEGORY = " ";
+
+    private static final String[] CHART_COLORS = {
+            "#1f5fa8",
+            "#f5a623",
+            "#4caf50",
+            "#36a9c9",
+            "#4666d8",
+            "#9c46d4",
+            "#d13f64",
+            "#8c8c8c",
+            "#ff9800",
+            "#2e7d32"
+    };
+
     private static final int MIN_YEAR = 1900;
     private static final int SEARCH_LIMIT = 20;
     private static final int MAX_SELECTED_VENUES = 10;
+
+    private static final int MIN_SEARCH_LENGTH = 3;
+    private static final int SEARCH_DEBOUNCE_MS = 250;
 
     private final JournalService journalService = new JournalService();
     private final ConferenceService conferenceService = new ConferenceService();
 
     private Object selectedSearchVenue;
+
+    private PauseTransition searchDebounce;
+
+    private Task<List<Object>> venueSearchTask;
 
     @FXML
     private ComboBox<String> venueTypeComboBox;
@@ -93,6 +131,24 @@ public class ChartsController {
     private ComboBox<Integer> toYearComboBox;
 
     @FXML
+    private VBox lineChartLegendBox;
+
+    @FXML
+    private FlowPane lineChartLegendFlow;
+
+    @FXML
+    private VBox barChartsLegendBox;
+
+    @FXML
+    private FlowPane barChartsLegendFlow;
+
+    @FXML
+    private VBox scatterLegendBox;
+
+    @FXML
+    private FlowPane scatterLegendFlow;
+
+    @FXML
     private LineChart<Number, Number> comparisonLineChart;
 
     @FXML
@@ -100,6 +156,42 @@ public class ChartsController {
 
     @FXML
     private NumberAxis valueAxis;
+
+    @FXML
+    private BarChart<String, Number> totalArticlesBarChart;
+
+    @FXML
+    private CategoryAxis totalArticlesCategoryAxis;
+
+    @FXML
+    private NumberAxis totalArticlesValueAxis;
+
+    @FXML
+    private BarChart<String, Number> avgArticlesBarChart;
+
+    @FXML
+    private CategoryAxis avgArticlesCategoryAxis;
+
+    @FXML
+    private NumberAxis avgArticlesValueAxis;
+
+    @FXML
+    private BarChart<String, Number> avgAuthorEntriesBarChart;
+
+    @FXML
+    private CategoryAxis avgAuthorEntriesCategoryAxis;
+
+    @FXML
+    private NumberAxis avgAuthorEntriesValueAxis;
+
+    @FXML
+    private ScatterChart<Number, Number> venueScatterChart;
+
+    @FXML
+    private NumberAxis scatterArticlesAxis;
+
+    @FXML
+    private NumberAxis scatterAuthorsAxis;
 
     @FXML
     public void initialize() {
@@ -110,6 +202,7 @@ public class ChartsController {
         setupSearchResultsListView();
         setupSelectedVenuesListView();
         setupChart();
+        setupExtraCharts();
 
         selectedSearchVenue = null;
         clearSearchResults();
@@ -118,34 +211,65 @@ public class ChartsController {
 
     @FXML
     private void searchVenues() {
+        executeVenueSearch(true);
+    }
+
+    private void searchVenuesRealtime() {
+        executeVenueSearch(false);
+    }
+
+    private void executeVenueSearch(boolean showAlerts) {
         String venueType = getSelectedVenueType();
         String searchText = venueSearchField == null ? "" : venueSearchField.getText().trim();
 
+        if (venueSearchTask != null && venueSearchTask.isRunning()) {
+            venueSearchTask.cancel();
+        }
+
         if (venueType == null || venueType.isBlank()) {
-            showError("Δεν επιλέχθηκε τύπος", "Πρέπει πρώτα να επιλέξεις Journal ή Conference.");
+            clearSearchResults();
+
+            if (showAlerts) {
+                showError("Δεν επιλέχθηκε τύπος", "Πρέπει πρώτα να επιλέξεις Journal ή Conference.");
+            }
+
             return;
         }
 
-        if (searchText.isBlank()) {
-            showError("Λάθος αναζήτηση", "Πρέπει να γράψεις όνομα journal ή conference.");
+        if (searchText.length() < MIN_SEARCH_LENGTH) {
+            selectedSearchVenue = null;
+            clearSearchResults();
+
+            if (showAlerts && searchText.isBlank()) {
+                showError("Λάθος αναζήτηση", "Πρέπει να γράψεις όνομα journal ή conference.");
+            } else if (showAlerts) {
+                showError(
+                        "Λάθος αναζήτηση",
+                        "Πρέπει να γράψεις τουλάχιστον 3 χαρακτήρες."
+                );
+            }
+
             return;
         }
+
+        String requestedVenueType = venueType;
+        String requestedSearchText = searchText;
 
         selectedSearchVenue = null;
         clearSearchResultsOnly();
 
-        Task<List<Object>> task = new Task<>() {
+        venueSearchTask = new Task<>() {
             @Override
             protected List<Object> call() {
                 List<Object> results = new ArrayList<>();
 
-                if (TYPE_JOURNAL.equals(venueType)) {
-                    results.addAll(journalService.searchJournals(searchText, SEARCH_LIMIT));
+                if (TYPE_JOURNAL.equals(requestedVenueType)) {
+                    results.addAll(journalService.searchJournals(requestedSearchText, SEARCH_LIMIT));
                     return results;
                 }
 
-                if (TYPE_CONFERENCE.equals(venueType)) {
-                    results.addAll(conferenceService.searchConferences(searchText, SEARCH_LIMIT));
+                if (TYPE_CONFERENCE.equals(requestedVenueType)) {
+                    results.addAll(conferenceService.searchConferences(requestedSearchText, SEARCH_LIMIT));
                     return results;
                 }
 
@@ -153,17 +277,36 @@ public class ChartsController {
             }
         };
 
-        setLoading(true);
+        if (showAlerts) {
+            setLoading(true);
+        }
 
-        task.setOnSucceeded(event -> {
-            setLoading(false);
+        venueSearchTask.setOnSucceeded(event -> {
+            if (showAlerts) {
+                setLoading(false);
+            }
 
-            List<Object> results = task.getValue();
-            results = sortVenueResultsByRelevance(results, searchText);
+            if (venueSearchTask.isCancelled()) {
+                return;
+            }
+
+            String currentSearchText = venueSearchField == null ? "" : venueSearchField.getText().trim();
+            String currentVenueType = getSelectedVenueType();
+
+            if (!requestedSearchText.equals(currentSearchText)) {
+                return;
+            }
+
+            if (!requestedVenueType.equals(currentVenueType)) {
+                return;
+            }
+
+            List<Object> results = venueSearchTask.getValue();
+            results = sortVenueResultsByRelevance(results, requestedSearchText);
 
             renderSearchResults(results);
 
-            if (results.isEmpty()) {
+            if (results.isEmpty() && showAlerts) {
                 showInfo(
                         "Δεν βρέθηκαν αποτελέσματα",
                         "Δεν βρέθηκε journal/conference με αυτό το κείμενο αναζήτησης."
@@ -171,49 +314,73 @@ public class ChartsController {
             }
         });
 
-        task.setOnFailed(event -> {
-            setLoading(false);
-            Throwable exception = task.getException();
-            showError("Σφάλμα αναζήτησης", exception == null ? null : exception.getMessage());
+        venueSearchTask.setOnFailed(event -> {
+            if (showAlerts) {
+                setLoading(false);
+            }
+
+            Throwable exception = venueSearchTask.getException();
+
+            if (showAlerts) {
+                showError("Σφάλμα αναζήτησης", exception == null ? null : exception.getMessage());
+            } else {
+                clearSearchResults();
+            }
         });
 
-        startBackgroundTask(task, "charts-search-task");
+        startBackgroundTask(venueSearchTask, "charts-search-task");
     }
 
     @FXML
     private void addSelectedVenue() {
+        addSelectedVenueFromSearch(selectedSearchVenue, true);
+    }
+
+    private void addSelectedVenueFromSearch(Object venue, boolean showMessages) {
         if (selectedVenuesListView == null) {
             return;
         }
 
-        if (selectedSearchVenue == null) {
-            showError(
-                    "Δεν επιλέχθηκε venue",
-                    "Πρέπει πρώτα να επιλέξεις ένα αποτέλεσμα από τη λίστα Matching results."
-            );
+        if (venue == null) {
+            if (showMessages) {
+                showError(
+                        "Δεν επιλέχθηκε venue",
+                        "Πρέπει πρώτα να επιλέξεις ένα αποτέλεσμα από τη λίστα Matching results."
+                );
+            }
+
             return;
         }
 
         String venueType = getSelectedVenueType();
 
         if (venueType == null || venueType.isBlank()) {
-            showError("Δεν επιλέχθηκε τύπος", "Πρέπει πρώτα να επιλέξεις Journal ή Conference.");
+            if (showMessages) {
+                showError("Δεν επιλέχθηκε τύπος", "Πρέπει πρώτα να επιλέξεις Journal ή Conference.");
+            }
+
             return;
         }
 
         if (selectedVenuesListView.getItems().size() >= MAX_SELECTED_VENUES) {
-            showError(
-                    "Πολλά venues",
-                    "Για να παραμένει ευανάγνωστο το chart, μπορείς να επιλέξεις μέχρι "
-                            + MAX_SELECTED_VENUES + " venues."
-            );
+            if (showMessages) {
+                showError(
+                        "Πολλά venues",
+                        "Για να παραμένει ευανάγνωστο το chart, μπορείς να επιλέξεις μέχρι "
+                                + MAX_SELECTED_VENUES + " venues."
+                );
+            }
+
             return;
         }
 
-        SelectedVenue selectedVenue = new SelectedVenue(venueType, selectedSearchVenue);
+        SelectedVenue selectedVenue = new SelectedVenue(venueType, venue);
 
         if (alreadySelected(selectedVenue)) {
-            showInfo("Ήδη επιλεγμένο", "Το συγκεκριμένο venue υπάρχει ήδη στη λίστα.");
+            if (showMessages) {
+                showInfo("Ήδη επιλεγμένο", "Το συγκεκριμένο venue υπάρχει ήδη στη λίστα.");
+            }
+
             return;
         }
 
@@ -249,7 +416,7 @@ public class ChartsController {
         String metric = metricComboBox == null ? null : metricComboBox.getValue();
 
         if (metric == null || metric.isBlank()) {
-            showError("Δεν επιλέχθηκε metric", "Πρέπει να επιλέξεις τι θέλεις να εμφανίζει το chart.");
+            showError("Δεν επιλέχθηκε metric", "Πρέπει να επιλέξεις τι θέλεις να εμφανίζει το line chart.");
             return;
         }
 
@@ -280,11 +447,17 @@ public class ChartsController {
                                         yearRange.endYear()
                                 );
 
+                        List<Object> yearlyStats = new ArrayList<>();
+
+                        if (stats != null) {
+                            yearlyStats.addAll(stats);
+                        }
+
                         chartSeries.add(
                                 new VenueChartSeries(
                                         getVenueDisplayName(selectedVenue),
                                         selectedVenue.type(),
-                                        new ArrayList<>(stats)
+                                        yearlyStats
                                 )
                         );
                     }
@@ -299,11 +472,17 @@ public class ChartsController {
                                         yearRange.endYear()
                                 );
 
+                        List<Object> yearlyStats = new ArrayList<>();
+
+                        if (stats != null) {
+                            yearlyStats.addAll(stats);
+                        }
+
                         chartSeries.add(
                                 new VenueChartSeries(
                                         getVenueDisplayName(selectedVenue),
                                         selectedVenue.type(),
-                                        new ArrayList<>(stats)
+                                        yearlyStats
                                 )
                         );
                     }
@@ -317,13 +496,18 @@ public class ChartsController {
 
         task.setOnSucceeded(event -> {
             setLoading(false);
-            updateLineChart(task.getValue(), metric);
+
+            List<VenueChartSeries> chartData = task.getValue();
+
+            updateLineChart(chartData, metric);
+            updateBarChart(chartData);
+            updateScatterChart(chartData);
         });
 
         task.setOnFailed(event -> {
             setLoading(false);
             Throwable exception = task.getException();
-            showError("Σφάλμα φόρτωσης chart", exception == null ? null : exception.getMessage());
+            showError("Σφάλμα φόρτωσης charts", exception == null ? null : exception.getMessage());
         });
 
         startBackgroundTask(task, "charts-load-task");
@@ -331,6 +515,8 @@ public class ChartsController {
 
     @FXML
     private void clear() {
+        stopCurrentVenueSearch();
+
         if (venueSearchField != null) {
             venueSearchField.clear();
         }
@@ -356,6 +542,8 @@ public class ChartsController {
 
     @FXML
     private void backToHome() {
+        stopCurrentVenueSearch();
+
         try {
             Parent root = FXMLLoader.load(
                     getClass().getResource(HOME_FXML_PATH)
@@ -381,8 +569,16 @@ public class ChartsController {
         venueTypeComboBox.getSelectionModel().select(TYPE_JOURNAL);
 
         venueTypeComboBox.setOnAction(event -> {
+            stopCurrentVenueSearch();
+
             selectedSearchVenue = null;
             clearSearchResults();
+
+            String searchText = venueSearchField == null ? "" : venueSearchField.getText().trim();
+
+            if (searchText.length() >= MIN_SEARCH_LENGTH && searchDebounce != null) {
+                searchDebounce.playFromStart();
+            }
         });
     }
 
@@ -453,9 +649,24 @@ public class ChartsController {
     }
 
     private void setupSearchField() {
-        if (venueSearchField != null) {
-            venueSearchField.setOnAction(event -> searchVenues());
+        searchDebounce = new PauseTransition(Duration.millis(SEARCH_DEBOUNCE_MS));
+        searchDebounce.setOnFinished(event -> searchVenuesRealtime());
+
+        if (venueSearchField == null) {
+            return;
         }
+
+        venueSearchField.textProperty().addListener((observable, oldValue, newValue) -> {
+            if (searchDebounce != null) {
+                searchDebounce.playFromStart();
+            }
+        });
+
+        /*
+         * To Enter menei san extra shortcut,
+         * alla den einai pleon aparaitito.
+         */
+        venueSearchField.setOnAction(event -> searchVenues());
     }
 
     private void setupSearchResultsListView() {
@@ -465,17 +676,32 @@ public class ChartsController {
 
         searchResultsListView.setPlaceholder(new Label("Search results will appear here."));
 
-        searchResultsListView.setCellFactory(listView -> new ListCell<>() {
-            @Override
-            protected void updateItem(Object venue, boolean empty) {
-                super.updateItem(venue, empty);
+        searchResultsListView.setCellFactory(listView -> {
+            ListCell<Object> cell = new ListCell<>() {
+                @Override
+                protected void updateItem(Object venue, boolean empty) {
+                    super.updateItem(venue, empty);
 
-                if (empty || venue == null) {
-                    setText(null);
-                } else {
-                    setText(getRawVenueDisplayName(venue));
+                    if (empty || venue == null) {
+                        setText(null);
+                    } else {
+                        setText(getRawVenueDisplayName(venue));
+                    }
                 }
-            }
+            };
+
+            cell.setOnMouseClicked(event -> {
+                if (event.getButton() == MouseButton.PRIMARY
+                        && event.getClickCount() == 2
+                        && !cell.isEmpty()
+                        && cell.getItem() != null) {
+
+                    selectedSearchVenue = cell.getItem();
+                    addSelectedVenueFromSearch(cell.getItem(), false);
+                }
+            });
+
+            return cell;
         });
 
         searchResultsListView.getSelectionModel().selectedItemProperty().addListener(
@@ -490,25 +716,39 @@ public class ChartsController {
 
         selectedVenuesListView.setPlaceholder(new Label("Selected venues will appear here."));
 
-        selectedVenuesListView.setCellFactory(listView -> new ListCell<>() {
-            @Override
-            protected void updateItem(SelectedVenue selectedVenue, boolean empty) {
-                super.updateItem(selectedVenue, empty);
+        selectedVenuesListView.setCellFactory(listView -> {
+            ListCell<SelectedVenue> cell = new ListCell<>() {
+                @Override
+                protected void updateItem(SelectedVenue selectedVenue, boolean empty) {
+                    super.updateItem(selectedVenue, empty);
 
-                if (empty || selectedVenue == null) {
-                    setText(null);
-                } else {
-                    setText(getVenueDisplayName(selectedVenue));
+                    if (empty || selectedVenue == null) {
+                        setText(null);
+                    } else {
+                        setText(getVenueDisplayName(selectedVenue));
+                    }
                 }
-            }
+            };
+
+            cell.setOnMouseClicked(event -> {
+                if (event.getButton() == MouseButton.PRIMARY
+                        && event.getClickCount() == 2
+                        && !cell.isEmpty()
+                        && cell.getItem() != null) {
+
+                    selectedVenuesListView.getItems().remove(cell.getItem());
+                }
+            });
+
+            return cell;
         });
     }
 
     private void setupChart() {
         if (comparisonLineChart != null) {
             comparisonLineChart.setAnimated(false);
-            comparisonLineChart.setCreateSymbols(false);
-            comparisonLineChart.setLegendVisible(true);
+            comparisonLineChart.setCreateSymbols(true);
+            comparisonLineChart.setLegendVisible(false);
         }
 
         if (yearAxis != null) {
@@ -518,6 +758,70 @@ public class ChartsController {
         }
 
         if (valueAxis != null) {
+            valueAxis.setAutoRanging(false);
+            valueAxis.setForceZeroInRange(true);
+        }
+    }
+
+    private void setupExtraCharts() {
+        setupSingleBarChart(
+                totalArticlesBarChart,
+                totalArticlesCategoryAxis,
+                totalArticlesValueAxis,
+                BAR_TOTAL_ARTICLES
+        );
+
+        setupSingleBarChart(
+                avgArticlesBarChart,
+                avgArticlesCategoryAxis,
+                avgArticlesValueAxis,
+                BAR_AVG_ARTICLES_PER_YEAR
+        );
+
+        setupSingleBarChart(
+                avgAuthorEntriesBarChart,
+                avgAuthorEntriesCategoryAxis,
+                avgAuthorEntriesValueAxis,
+                BAR_AVG_AUTHOR_ENTRIES_PER_YEAR
+        );
+
+        if (venueScatterChart != null) {
+            venueScatterChart.setAnimated(false);
+            venueScatterChart.setLegendVisible(false);
+        }
+
+        if (scatterArticlesAxis != null) {
+            scatterArticlesAxis.setAutoRanging(false);
+            scatterArticlesAxis.setForceZeroInRange(true);
+        }
+
+        if (scatterAuthorsAxis != null) {
+            scatterAuthorsAxis.setAutoRanging(false);
+            scatterAuthorsAxis.setForceZeroInRange(true);
+        }
+    }
+
+    private void setupSingleBarChart(
+            BarChart<String, Number> chart,
+            CategoryAxis categoryAxis,
+            NumberAxis valueAxis,
+            String valueLabel
+    ) {
+        if (chart != null) {
+            chart.setAnimated(false);
+            chart.setLegendVisible(false);
+            chart.setCategoryGap(18);
+            chart.setBarGap(4);
+        }
+
+        if (categoryAxis != null) {
+            categoryAxis.setLabel("");
+            categoryAxis.setTickLabelsVisible(false);
+            categoryAxis.setTickMarkVisible(false);
+        }
+
+        if (valueAxis != null) {
+            valueAxis.setLabel(valueLabel);
             valueAxis.setAutoRanging(false);
             valueAxis.setForceZeroInRange(true);
         }
@@ -563,6 +867,16 @@ public class ChartsController {
         }
 
         selectedSearchVenue = null;
+    }
+
+    private void stopCurrentVenueSearch() {
+        if (searchDebounce != null) {
+            searchDebounce.stop();
+        }
+
+        if (venueSearchTask != null && venueSearchTask.isRunning()) {
+            venueSearchTask.cancel();
+        }
     }
 
     private List<Object> sortVenueResultsByRelevance(List<Object> results, String query) {
@@ -670,12 +984,14 @@ public class ChartsController {
         clearChart();
 
         if (allSeries == null || allSeries.isEmpty()) {
+            updateCustomLegend(null);
             return;
         }
 
         Integer minYear = null;
         Integer maxYear = null;
-        long maxValue = 0;
+        double maxValue = 0;
+        int seriesIndex = 0;
 
         for (VenueChartSeries venueSeries : allSeries) {
             XYChart.Series<Number, Number> series = new XYChart.Series<>();
@@ -698,7 +1014,12 @@ public class ChartsController {
 
             if (!series.getData().isEmpty() && comparisonLineChart != null) {
                 comparisonLineChart.getData().add(series);
+
+                final int colorIndex = seriesIndex;
+                runAfterChartRender(() -> applyLineSeriesColor(series, colorIndex));
             }
+
+            seriesIndex++;
         }
 
         configureYearAxis(yearAxis, minYear, maxYear);
@@ -707,6 +1028,194 @@ public class ChartsController {
         if (valueAxis != null) {
             valueAxis.setLabel(metric);
         }
+
+        updateCustomLegend(allSeries);
+    }
+
+    private void updateBarChart(List<VenueChartSeries> allSeries) {
+        updateSingleMetricBarChart(
+                totalArticlesBarChart,
+                totalArticlesValueAxis,
+                allSeries,
+                BAR_TOTAL_ARTICLES
+        );
+
+        updateSingleMetricBarChart(
+                avgArticlesBarChart,
+                avgArticlesValueAxis,
+                allSeries,
+                BAR_AVG_ARTICLES_PER_YEAR
+        );
+
+        updateSingleMetricBarChart(
+                avgAuthorEntriesBarChart,
+                avgAuthorEntriesValueAxis,
+                allSeries,
+                BAR_AVG_AUTHOR_ENTRIES_PER_YEAR
+        );
+    }
+
+    private void updateSingleMetricBarChart(
+            BarChart<String, Number> chart,
+            NumberAxis valueAxis,
+            List<VenueChartSeries> allSeries,
+            String metric
+    ) {
+        if (chart == null) {
+            return;
+        }
+
+        chart.getData().clear();
+
+        if (allSeries == null || allSeries.isEmpty()) {
+            configureValueAxis(valueAxis, 10);
+            return;
+        }
+
+        double maxValue = 0;
+        int seriesIndex = 0;
+
+        for (VenueChartSeries venueSeries : allSeries) {
+            VenueAggregate aggregate = calculateVenueAggregate(venueSeries);
+
+            String venueName = shortenSeriesName(venueSeries.name());
+            double value = getBarMetricValue(aggregate, metric);
+
+            XYChart.Series<String, Number> series = new XYChart.Series<>();
+            series.setName(venueName);
+
+            XYChart.Data<String, Number> dataPoint =
+                    new XYChart.Data<>(BAR_SINGLE_CATEGORY, value);
+
+            series.getData().add(dataPoint);
+            chart.getData().add(series);
+
+            final int colorIndex = seriesIndex;
+            runAfterChartRender(() -> applyBarColor(dataPoint, colorIndex));
+
+            maxValue = Math.max(maxValue, value);
+            seriesIndex++;
+        }
+
+        if (valueAxis != null) {
+            valueAxis.setLabel(metric);
+        }
+
+        configureValueAxis(valueAxis, maxValue);
+    }
+
+    private double getBarMetricValue(VenueAggregate aggregate, String metric) {
+        if (aggregate == null) {
+            return 0;
+        }
+
+        if (BAR_TOTAL_ARTICLES.equals(metric)) {
+            return aggregate.totalArticles();
+        }
+
+        if (BAR_AVG_ARTICLES_PER_YEAR.equals(metric)) {
+            return aggregate.avgArticlesPerYear();
+        }
+
+        if (BAR_AVG_AUTHOR_ENTRIES_PER_YEAR.equals(metric)) {
+            return aggregate.avgAuthorEntriesPerYear();
+        }
+
+        return 0;
+    }
+
+    private void updateScatterChart(List<VenueChartSeries> allSeries) {
+        if (venueScatterChart == null) {
+            return;
+        }
+
+        venueScatterChart.getData().clear();
+        venueScatterChart.setLegendVisible(false);
+
+        if (allSeries == null || allSeries.isEmpty()) {
+            configureValueAxis(scatterArticlesAxis, 10);
+            configureValueAxis(scatterAuthorsAxis, 10);
+            return;
+        }
+
+        double maxArticles = 0;
+        double maxAvgAuthors = 0;
+        int seriesIndex = 0;
+
+        for (VenueChartSeries venueSeries : allSeries) {
+            VenueAggregate aggregate = calculateVenueAggregate(venueSeries);
+
+            maxArticles = Math.max(maxArticles, aggregate.totalArticles());
+            maxAvgAuthors = Math.max(maxAvgAuthors, aggregate.avgAuthorEntriesPerYear());
+
+            XYChart.Series<Number, Number> series = new XYChart.Series<>();
+            series.setName(shortenSeriesName(venueSeries.name()));
+
+            XYChart.Data<Number, Number> dataPoint =
+                    new XYChart.Data<>(
+                            aggregate.totalArticles(),
+                            aggregate.avgAuthorEntriesPerYear()
+                    );
+
+            series.getData().add(dataPoint);
+            venueScatterChart.getData().add(series);
+
+            final int colorIndex = seriesIndex;
+            runAfterChartRender(() -> applyScatterColor(dataPoint, colorIndex));
+
+            seriesIndex++;
+        }
+
+        if (scatterArticlesAxis != null) {
+            scatterArticlesAxis.setLabel("Total articles");
+        }
+
+        if (scatterAuthorsAxis != null) {
+            scatterAuthorsAxis.setLabel("Avg author entries / year");
+        }
+
+        configureValueAxis(scatterArticlesAxis, maxArticles);
+        configureValueAxis(scatterAuthorsAxis, maxAvgAuthors);
+    }
+
+    private VenueAggregate calculateVenueAggregate(VenueChartSeries venueSeries) {
+        if (venueSeries == null || venueSeries.yearlyStats() == null || venueSeries.yearlyStats().isEmpty()) {
+            return new VenueAggregate(0, 0, 0, 0, 0);
+        }
+
+        long totalArticles = 0;
+        long totalAuthorEntries = 0;
+        int activeYears = 0;
+
+        for (Object stat : venueSeries.yearlyStats()) {
+            Long articles = extractMetricValue(stat, METRIC_ARTICLES);
+            Long authorEntries = extractMetricValue(stat, METRIC_AUTHOR_ENTRIES);
+
+            if (articles == null && authorEntries == null) {
+                continue;
+            }
+
+            activeYears++;
+
+            if (articles != null) {
+                totalArticles += articles;
+            }
+
+            if (authorEntries != null) {
+                totalAuthorEntries += authorEntries;
+            }
+        }
+
+        double avgArticlesPerYear = activeYears == 0 ? 0 : (double) totalArticles / activeYears;
+        double avgAuthorEntriesPerYear = activeYears == 0 ? 0 : (double) totalAuthorEntries / activeYears;
+
+        return new VenueAggregate(
+                totalArticles,
+                totalAuthorEntries,
+                activeYears,
+                avgArticlesPerYear,
+                avgAuthorEntriesPerYear
+        );
     }
 
     private void clearChart() {
@@ -714,8 +1223,37 @@ public class ChartsController {
             comparisonLineChart.getData().clear();
         }
 
+        clearBarCharts();
+
+        if (venueScatterChart != null) {
+            venueScatterChart.getData().clear();
+        }
+
         configureYearAxis(yearAxis, MIN_YEAR, LocalDate.now().getYear());
         configureValueAxis(valueAxis, 10);
+
+        configureValueAxis(totalArticlesValueAxis, 10);
+        configureValueAxis(avgArticlesValueAxis, 10);
+        configureValueAxis(avgAuthorEntriesValueAxis, 10);
+
+        configureValueAxis(scatterArticlesAxis, 10);
+        configureValueAxis(scatterAuthorsAxis, 10);
+
+        updateCustomLegend(null);
+    }
+
+    private void clearBarCharts() {
+        if (totalArticlesBarChart != null) {
+            totalArticlesBarChart.getData().clear();
+        }
+
+        if (avgArticlesBarChart != null) {
+            avgArticlesBarChart.getData().clear();
+        }
+
+        if (avgAuthorEntriesBarChart != null) {
+            avgAuthorEntriesBarChart.getData().clear();
+        }
     }
 
     private void configureYearAxis(NumberAxis axis, Integer minYear, Integer maxYear) {
@@ -762,7 +1300,7 @@ public class ChartsController {
         return 20;
     }
 
-    private void configureValueAxis(NumberAxis axis, long maxValue) {
+    private void configureValueAxis(NumberAxis axis, double maxValue) {
         if (axis == null) {
             return;
         }
@@ -777,65 +1315,182 @@ public class ChartsController {
         axis.setMinorTickVisible(false);
     }
 
-    private double calculateNiceUpperBound(long maxValue) {
+    private double calculateNiceUpperBound(double maxValue) {
         if (maxValue <= 0) {
             return 10;
         }
 
-        double paddedValue = maxValue * 1.15;
+        double paddedValue = maxValue * 1.08;
+        double roughTickUnit = paddedValue / 7.0;
+        double tickUnit = calculateNiceRawTickUnit(roughTickUnit);
 
-        if (paddedValue <= 10) {
-            return Math.ceil(paddedValue);
-        }
-
-        double magnitude = Math.pow(10, Math.floor(Math.log10(paddedValue)));
-        double normalized = paddedValue / magnitude;
-
-        double rounded;
-
-        if (normalized <= 1) {
-            rounded = 1;
-        } else if (normalized <= 2) {
-            rounded = 2;
-        } else if (normalized <= 5) {
-            rounded = 5;
-        } else {
-            rounded = 10;
-        }
-
-        return rounded * magnitude;
+        return Math.ceil(paddedValue / tickUnit) * tickUnit;
     }
 
     private double calculateNiceTickUnit(double upperBound) {
-        if (upperBound <= 10) {
+        if (upperBound <= 0) {
             return 1;
         }
 
-        if (upperBound <= 20) {
-            return 2;
+        double roughTickUnit = upperBound / 7.0;
+        return calculateNiceRawTickUnit(roughTickUnit);
+    }
+
+    private double calculateNiceRawTickUnit(double value) {
+        if (value <= 0) {
+            return 1;
         }
 
-        if (upperBound <= 50) {
-            return 5;
+        double magnitude = Math.pow(10, Math.floor(Math.log10(value)));
+        double normalized = value / magnitude;
+
+        double niceNormalized;
+
+        if (normalized <= 1) {
+            niceNormalized = 1;
+        } else if (normalized <= 2) {
+            niceNormalized = 2;
+        } else if (normalized <= 2.5) {
+            niceNormalized = 2.5;
+        } else if (normalized <= 5) {
+            niceNormalized = 5;
+        } else {
+            niceNormalized = 10;
         }
 
-        if (upperBound <= 100) {
-            return 10;
+        return niceNormalized * magnitude;
+    }
+
+    private String getChartColor(int index) {
+        return CHART_COLORS[index % CHART_COLORS.length];
+    }
+
+    private void runAfterChartRender(Runnable action) {
+        Platform.runLater(() -> Platform.runLater(action));
+    }
+
+    private void applyLineSeriesColor(XYChart.Series<Number, Number> series, int colorIndex) {
+        if (series == null) {
+            return;
         }
 
-        if (upperBound <= 500) {
-            return 50;
+        String color = getChartColor(colorIndex);
+        Node line = series.getNode();
+
+        if (line != null) {
+            line.setStyle(
+                    "-fx-stroke: " + color + ";" +
+                            "-fx-stroke-width: 2.4px;"
+            );
         }
 
-        if (upperBound <= 1000) {
-            return 100;
+        for (XYChart.Data<Number, Number> data : series.getData()) {
+            Node symbol = data.getNode();
+
+            if (symbol != null) {
+                symbol.setStyle(
+                        "-fx-background-color: " + color + ", white;" +
+                                "-fx-background-insets: 0, 2;" +
+                                "-fx-background-radius: 7px;" +
+                                "-fx-padding: 4px;"
+                );
+            }
+        }
+    }
+
+    private void applyBarColor(XYChart.Data<String, Number> dataPoint, int colorIndex) {
+        if (dataPoint == null || dataPoint.getNode() == null) {
+            return;
         }
 
-        if (upperBound <= 5000) {
-            return 500;
+        String color = getChartColor(colorIndex);
+
+        dataPoint.getNode().setStyle(
+                "-fx-bar-fill: " + color + ";"
+        );
+    }
+
+    private void applyScatterColor(XYChart.Data<Number, Number> dataPoint, int colorIndex) {
+        if (dataPoint == null || dataPoint.getNode() == null) {
+            return;
         }
 
-        return Math.ceil(upperBound / 10.0);
+        String color = getChartColor(colorIndex);
+
+        dataPoint.getNode().setStyle(
+                "-fx-background-color: " + color + ", white;" +
+                        "-fx-background-insets: 0, 2;" +
+                        "-fx-background-radius: 8px;" +
+                        "-fx-padding: 5px;"
+        );
+    }
+
+    private void updateCustomLegend(List<VenueChartSeries> allSeries) {
+        updateLegendFlow(lineChartLegendBox, lineChartLegendFlow, allSeries);
+        updateLegendFlow(barChartsLegendBox, barChartsLegendFlow, allSeries);
+        updateLegendFlow(scatterLegendBox, scatterLegendFlow, allSeries);
+    }
+
+    private void updateLegendFlow(
+            VBox legendBox,
+            FlowPane legendFlow,
+            List<VenueChartSeries> allSeries
+    ) {
+        if (legendBox == null || legendFlow == null) {
+            return;
+        }
+
+        legendFlow.getChildren().clear();
+
+        if (allSeries == null || allSeries.isEmpty()) {
+            legendBox.setVisible(false);
+            legendBox.setManaged(false);
+            return;
+        }
+
+        int index = 0;
+
+        for (VenueChartSeries venueSeries : allSeries) {
+            String color = getChartColor(index);
+            String fullName = venueSeries.name();
+            String shortName = shortenSeriesName(fullName);
+
+            Region colorDot = new Region();
+            colorDot.setMinSize(10, 10);
+            colorDot.setPrefSize(10, 10);
+            colorDot.setMaxSize(10, 10);
+            colorDot.setStyle(
+                    "-fx-background-color: " + color + ";" +
+                            "-fx-background-radius: 999px;"
+            );
+
+            Label nameLabel = new Label(shortName);
+            nameLabel.setStyle(
+                    "-fx-text-fill: #0f4c81;" +
+                            "-fx-font-size: 11px;" +
+                            "-fx-font-weight: 700;"
+            );
+
+            if (fullName != null && fullName.length() > 45) {
+                Tooltip.install(nameLabel, new Tooltip(fullName));
+            }
+
+            HBox legendItem = new HBox(6, colorDot, nameLabel);
+            legendItem.setAlignment(Pos.CENTER_LEFT);
+            legendItem.setStyle(
+                    "-fx-background-color: rgba(255,255,255,0.95);" +
+                            "-fx-border-color: #b9daf7;" +
+                            "-fx-border-radius: 999px;" +
+                            "-fx-background-radius: 999px;" +
+                            "-fx-padding: 5 9 5 9;"
+            );
+
+            legendFlow.getChildren().add(legendItem);
+            index++;
+        }
+
+        legendBox.setVisible(true);
+        legendBox.setManaged(true);
     }
 
     private YearRange getSelectedYearRange() {
@@ -1048,6 +1703,26 @@ public class ChartsController {
         if (selectedVenuesListView != null) {
             selectedVenuesListView.setDisable(loading);
         }
+
+        if (comparisonLineChart != null) {
+            comparisonLineChart.setDisable(loading);
+        }
+
+        if (totalArticlesBarChart != null) {
+            totalArticlesBarChart.setDisable(loading);
+        }
+
+        if (avgArticlesBarChart != null) {
+            avgArticlesBarChart.setDisable(loading);
+        }
+
+        if (avgAuthorEntriesBarChart != null) {
+            avgAuthorEntriesBarChart.setDisable(loading);
+        }
+
+        if (venueScatterChart != null) {
+            venueScatterChart.setDisable(loading);
+        }
     }
 
     private void startBackgroundTask(Task<?> task, String threadName) {
@@ -1082,6 +1757,15 @@ public class ChartsController {
             String name,
             String type,
             List<Object> yearlyStats
+    ) {
+    }
+
+    private record VenueAggregate(
+            long totalArticles,
+            long totalAuthorEntries,
+            int activeYears,
+            double avgArticlesPerYear,
+            double avgAuthorEntriesPerYear
     ) {
     }
 

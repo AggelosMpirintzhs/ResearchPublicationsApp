@@ -59,11 +59,11 @@
 
                     <VBox spacing="22"
                           alignment="TOP_CENTER"
-                          maxWidth="1200">
+                          maxWidth="1500">
 
                         <!-- ================= HERO ================= -->
                         <VBox spacing="10"
-                              maxWidth="Infinity"
+                              maxWidth="1500"
                               styleClass="venue-hero-card">
 
                             <HBox alignment="CENTER_LEFT" spacing="14">
@@ -83,7 +83,7 @@
 
                         <!-- ================= FILTERS ================= -->
                         <VBox spacing="16"
-                              maxWidth="1200"
+                              maxWidth="1500"
                               styleClass="filter-card">
 
                             <VBox spacing="5">
@@ -95,41 +95,63 @@
                                        wrapText="true"/>
                             </VBox>
 
-                            <HBox spacing="12" alignment="CENTER_LEFT" styleClass="form-row">
-                                <ComboBox fx:id="yearComboBox"
-                                          promptText="Select year"
-                                          prefWidth="180"
-                                          styleClass="form-control"/>
+                            <VBox spacing="12"
+                                  styleClass="google-search-section"
+                                  maxWidth="1500">
 
-                                <ComboBox fx:id="publicationTypeComboBox"
-                                          promptText="Publication type"
-                                          prefWidth="180"
-                                          styleClass="form-control"/>
+                                <VBox spacing="4">
+                                    <Label text="Search publication year"
+                                           styleClass="google-search-title"/>
 
-                                <CheckBox fx:id="loadPublicationsCheckBox"
-                                          text="Load publications"
-                                          selected="false"
-                                          prefWidth="185"
-                                          minWidth="185"
-                                          minHeight="38"
-                                          alignment="CENTER_LEFT"
-                                          styleClass="load-articles-toggle"/>
+                                    <Label text="Select a publication year and optionally load the related publication report."
+                                           wrapText="true"
+                                           styleClass="google-search-subtitle"/>
+                                </VBox>
 
-                                <Button fx:id="loadYearButton"
-                                        text="Load Year Profile"
-                                        onAction="#loadYearProfile"
-                                        styleClass="primary-button"/>
+                                <HBox spacing="10"
+                                      alignment="CENTER_LEFT"
+                                      styleClass="google-search-bar">
 
-                                <Button fx:id="refreshYearsButton"
-                                        text="Refresh Years"
-                                        onAction="#loadAvailableYears"
-                                        styleClass="secondary-button"/>
+                                    <Label text="⌕"
+                                           styleClass="google-search-icon"/>
 
-                                <Button fx:id="clearButton"
-                                        text="Clear"
-                                        onAction="#clear"
-                                        styleClass="secondary-button"/>
-                            </HBox>
+                                    <ComboBox fx:id="yearComboBox"
+                                              promptText="Select year"
+                                              prefWidth="165"
+                                              styleClass="google-search-combo"/>
+
+                                    <ComboBox fx:id="publicationTypeComboBox"
+                                              promptText="Publication type"
+                                              prefWidth="180"
+                                              styleClass="google-search-combo"/>
+
+                                    <CheckBox fx:id="loadPublicationsCheckBox"
+                                              text="Load publications"
+                                              selected="false"
+                                              prefWidth="175"
+                                              minWidth="175"
+                                              minHeight="38"
+                                              alignment="CENTER_LEFT"
+                                              styleClass="google-toggle"/>
+
+                                    <Region HBox.hgrow="ALWAYS"/>
+
+                                    <Button fx:id="loadYearButton"
+                                            text="Load Profile"
+                                            onAction="#loadYearProfile"
+                                            styleClass="google-search-button"/>
+
+                                    <Button fx:id="refreshYearsButton"
+                                            text="Refresh"
+                                            onAction="#loadAvailableYears"
+                                            styleClass="google-secondary-button"/>
+
+                                    <Button fx:id="clearButton"
+                                            text="Clear"
+                                            onAction="#clear"
+                                            styleClass="google-secondary-button"/>
+                                </HBox>
+                            </VBox>
 
                             <HBox spacing="10" alignment="CENTER_LEFT" styleClass="selected-strip">
                                 <Label text="Selected"
@@ -143,7 +165,7 @@
 
                         <!-- ================= YEAR PROFILE STATISTICS ================= -->
                         <VBox spacing="16"
-                              maxWidth="1200"
+                              maxWidth="1500"
                               styleClass="stats-panel">
 
                             <HBox alignment="CENTER_LEFT">
@@ -209,7 +231,7 @@
                         <!-- ================= PUBLICATION REPORT ================= -->
                         <VBox fx:id="publicationReportPanel"
                               spacing="12"
-                              maxWidth="1200"
+                              maxWidth="1500"
                               styleClass="dashboard-panel article-report-panel">
 
                             <HBox alignment="CENTER_LEFT" spacing="12">
@@ -234,7 +256,7 @@
                                        prefHeight="350"
                                        minHeight="350"
                                        maxHeight="350"
-                                       maxWidth="Infinity"
+                                       maxWidth="1500"
                                        fixedCellSize="34"
                                        styleClass="articles-scroll-table">
                                 <columns>

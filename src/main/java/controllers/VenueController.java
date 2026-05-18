@@ -3,13 +3,12 @@ package controllers;
 import dto.conference.ConferenceArticleDto;
 import dto.conference.ConferenceProfileDto;
 import dto.conference.ConferenceRankingDto;
-import dto.conference.ConferenceSearchResultDto;
 import dto.conference.ConferenceYearlyStatsDto;
 import dto.journal.JournalArticleDto;
 import dto.journal.JournalProfileDto;
 import dto.journal.JournalRankingDto;
-import dto.journal.JournalSearchResultDto;
 import dto.journal.JournalYearlyStatsDto;
+import javafx.animation.PauseTransition;
 import javafx.application.Platform;
 import javafx.beans.property.ReadOnlyObjectWrapper;
 import javafx.beans.property.SimpleStringProperty;
@@ -34,36 +33,37 @@ import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.VBox;
-import service.ConferenceService;
-import service.JournalService;
+import javafx.util.Duration;
+import service.VenueService;
+import util.TableCopySupport;
 
 import java.io.IOException;
-import java.text.Normalizer;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
-import java.util.Optional;
 
 public class VenueController {
 
     private static final String HOME_FXML_PATH = "/com/example/project_pvasil/hello-view.fxml";
 
-    private static final String TYPE_JOURNAL = "Journal";
-    private static final String TYPE_CONFERENCE = "Conference";
-
     private static final int MIN_YEAR = 1900;
     private static final int SEARCH_LIMIT = 20;
 
+    private static final int MIN_VENUE_SEARCH_LENGTH = 3;
+    private static final int VENUE_SEARCH_DEBOUNCE_MS = 250;
+
     private static final int ARTICLE_BATCH_SIZE = 1000;
 
-    private final JournalService journalService = new JournalService();
-    private final ConferenceService conferenceService = new ConferenceService();
+    private final VenueService venueService = new VenueService();
 
     private final ObservableList<Object> articleItems =
             FXCollections.observableArrayList();
 
     private Object selectedVenue;
+
+    private PauseTransition venueSearchDebounce;
+
+    private Task<List<Object>> venueSearchTask;
 
     private volatile boolean stopArticleLoading = false;
 
@@ -190,7 +190,6 @@ public class VenueController {
 
     @FXML
     private VBox venueResultsContainer;
-    
 
     @FXML
     public void initialize() {
@@ -217,53 +216,98 @@ public class VenueController {
 
     @FXML
     private void searchVenues() {
+        executeVenueSearch(true);
+    }
+
+    private void searchVenuesRealtime() {
+        executeVenueSearch(false);
+    }
+
+    private void executeVenueSearch(boolean showAlerts) {
         stopCurrentArticleLoading();
 
         String venueType = getSelectedVenueType();
         String searchText = venueSearchField == null ? "" : venueSearchField.getText().trim();
 
+        if (venueSearchTask != null && venueSearchTask.isRunning()) {
+            venueSearchTask.cancel();
+        }
+
         if (venueType == null || venueType.isBlank()) {
-            showError("Δεν επιλέχθηκε τύπος", "Πρέπει πρώτα να επιλέξεις Journal ή Conference.");
+            if (showAlerts) {
+                showError("Δεν επιλέχθηκε τύπος", "Πρέπει πρώτα να επιλέξεις Journal ή Conference.");
+            }
+
             return;
         }
 
-        if (searchText.isBlank()) {
-            showError("Λάθος αναζήτηση", "Πρέπει να γράψεις όνομα journal ή conference.");
+        if (searchText.length() < MIN_VENUE_SEARCH_LENGTH) {
+            clearVenueResults();
+            setSelectedVenue(null);
+            clearResultArea();
+
+            if (showAlerts && !searchText.isBlank()) {
+                showError(
+                        "Λάθος αναζήτηση",
+                        "Πρέπει να γράψεις τουλάχιστον 3 χαρακτήρες."
+                );
+            }
+
+            if (showAlerts && searchText.isBlank()) {
+                showError(
+                        "Λάθος αναζήτηση",
+                        "Πρέπει να γράψεις όνομα journal ή conference."
+                );
+            }
+
             return;
         }
 
-        Task<List<Object>> task = new Task<>() {
+        String requestedVenueType = venueType;
+        String requestedSearchText = searchText;
+
+        venueSearchTask = new Task<>() {
             @Override
             protected List<Object> call() {
-                List<Object> results = new ArrayList<>();
-
-                if (TYPE_JOURNAL.equals(venueType)) {
-                    results.addAll(journalService.searchJournals(searchText, SEARCH_LIMIT));
-                    return results;
-                }
-
-                if (TYPE_CONFERENCE.equals(venueType)) {
-                    results.addAll(conferenceService.searchConferences(searchText, SEARCH_LIMIT));
-                    return results;
-                }
-
-                return results;
+                return venueService.searchVenues(
+                        requestedVenueType,
+                        requestedSearchText,
+                        SEARCH_LIMIT
+                );
             }
         };
 
-        setLoading(true);
+        if (showAlerts) {
+            setLoading(true);
+        }
 
-        task.setOnSucceeded(event -> {
-            setLoading(false);
+        venueSearchTask.setOnSucceeded(event -> {
+            if (showAlerts) {
+                setLoading(false);
+            }
 
-            List<Object> results = task.getValue();
-            results = sortVenueResultsByRelevance(results, searchText);
+            if (venueSearchTask.isCancelled()) {
+                return;
+            }
+
+            String currentSearchText = venueSearchField == null ? "" : venueSearchField.getText().trim();
+            String currentVenueType = getSelectedVenueType();
+
+            if (!requestedSearchText.equals(currentSearchText)) {
+                return;
+            }
+
+            if (!requestedVenueType.equals(currentVenueType)) {
+                return;
+            }
+
+            List<Object> results = venueSearchTask.getValue();
 
             clearResultArea();
             setSelectedVenue(null);
             renderVenueResults(results);
 
-            if (results.isEmpty()) {
+            if (results.isEmpty() && showAlerts) {
                 showInfo(
                         "Δεν βρέθηκαν αποτελέσματα",
                         "Δεν βρέθηκε journal/conference με αυτό το κείμενο αναζήτησης."
@@ -271,17 +315,30 @@ public class VenueController {
             }
         });
 
-        task.setOnFailed(event -> {
-            setLoading(false);
-            Throwable exception = task.getException();
-            showError("Σφάλμα αναζήτησης", exception == null ? null : exception.getMessage());
+        venueSearchTask.setOnFailed(event -> {
+            if (showAlerts) {
+                setLoading(false);
+            }
+
+            Throwable exception = venueSearchTask.getException();
+
+            if (exception != null) {
+                exception.printStackTrace();
+            }
+
+            if (showAlerts) {
+                showError("Σφάλμα αναζήτησης", exception == null ? null : exception.getMessage());
+            } else {
+                clearVenueResults();
+            }
         });
 
-        startBackgroundTask(task, "venue-search-task");
+        startBackgroundTask(venueSearchTask, "venue-realtime-search-task");
     }
 
     @FXML
     private void loadVenueProfile() {
+        stopCurrentVenueSearch();
         stopCurrentArticleLoading();
 
         String venueType = getSelectedVenueType();
@@ -311,72 +368,15 @@ public class VenueController {
         boolean shouldLoadArticles =
                 loadArticlesCheckBox != null && loadArticlesCheckBox.isSelected();
 
-        Task<VenuePageData> task = new Task<>() {
+        Task<VenueService.VenuePageData> task = new Task<>() {
             @Override
-            protected VenuePageData call() {
-                if (TYPE_JOURNAL.equals(venueType)) {
-                    int journalId = getJournalId(selectedVenue);
-
-                    Optional<JournalProfileDto> profile =
-                            journalService.getJournalProfile(
-                                    journalId,
-                                    yearRange.startYear(),
-                                    yearRange.endYear()
-                            );
-
-                    Optional<JournalRankingDto> ranking =
-                            journalService.getJournalRanking(journalId);
-
-                    List<JournalYearlyStatsDto> yearlyStats =
-                            journalService.getJournalYearlyStats(
-                                    journalId,
-                                    yearRange.startYear(),
-                                    yearRange.endYear()
-                            );
-
-                    List<Object> yearlyStatsAsObjects = new ArrayList<>();
-                    yearlyStatsAsObjects.addAll(yearlyStats);
-
-                    return new VenuePageData(
-                            TYPE_JOURNAL,
-                            profile.orElse(null),
-                            ranking.orElse(null),
-                            yearlyStatsAsObjects
-                    );
-                }
-
-                if (TYPE_CONFERENCE.equals(venueType)) {
-                    int conferenceId = getConferenceId(selectedVenue);
-
-                    Optional<ConferenceProfileDto> profile =
-                            conferenceService.getConferenceProfile(
-                                    conferenceId,
-                                    yearRange.startYear(),
-                                    yearRange.endYear()
-                            );
-
-                    Optional<ConferenceRankingDto> ranking =
-                            conferenceService.getConferenceRanking(conferenceId);
-
-                    List<ConferenceYearlyStatsDto> yearlyStats =
-                            conferenceService.getConferenceYearlyStats(
-                                    conferenceId,
-                                    yearRange.startYear(),
-                                    yearRange.endYear()
-                            );
-
-                    List<Object> yearlyStatsAsObjects = new ArrayList<>();
-                    yearlyStatsAsObjects.addAll(yearlyStats);
-
-                    return new VenuePageData(
-                            TYPE_CONFERENCE,
-                            profile.orElse(null),
-                            ranking.orElse(null),
-                            yearlyStatsAsObjects
-                    );
-                }
-
-                throw new IllegalArgumentException("Μη έγκυρος τύπος venue.");
+            protected VenueService.VenuePageData call() {
+                return venueService.loadVenuePageData(
+                        venueType,
+                        selectedVenue,
+                        yearRange.startYear(),
+                        yearRange.endYear()
+                );
             }
         };
 
@@ -385,42 +385,42 @@ public class VenueController {
         task.setOnSucceeded(event -> {
             setLoading(false);
 
-            VenuePageData data = task.getValue();
+            VenueService.VenuePageData data = task.getValue();
 
-            if (data.profile() == null) {
+            if (!data.hasAnyData()) {
                 clearResultArea();
                 showInfo(
                         "Δεν βρέθηκαν δεδομένα",
-                        "Δεν υπάρχουν δεδομένα για το επιλεγμένο venue στο συγκεκριμένο εύρος χρονιών."
+                        "Δεν υπάρχουν διαθέσιμα δεδομένα για το επιλεγμένο venue."
                 );
                 return;
             }
 
+            /*
+             * Αν δεν υπάρχει profile, σημαίνει ότι δεν υπάρχουν άρθρα
+             * στο συγκεκριμένο venue/range. Όμως μπορεί να υπάρχει ranking,
+             * οπότε το εμφανίζουμε κανονικά.
+             */
             updateProfileLabels(data.profile());
             updateRankingPanel(data.ranking());
             updateYearlyLineCharts(data.yearlyStats());
 
-            expectedArticleCount = getExpectedArticleCount(data.profile());
+            expectedArticleCount = data.expectedArticleCount();
 
-            if (shouldLoadArticles) {
+            if (shouldLoadArticles && data.hasArticleData()) {
                 articleItems.clear();
                 setArticleReportVisible(true);
                 updateArticlesLoadedLabel(0, expectedArticleCount);
 
-                int venueId = TYPE_JOURNAL.equals(venueType)
-                        ? getJournalId(selectedVenue)
-                        : getConferenceId(selectedVenue);
-
                 startArticleBatchLoading(
-                        venueType,
-                        venueId,
+                        data.venueType(),
+                        data.venueId(),
                         yearRange.startYear(),
                         yearRange.endYear()
                 );
             } else {
                 articleItems.clear();
-                expectedArticleCount = 0;
-                updateArticlesLoadedLabel(0, 0);
+                updateArticlesLoadedLabel(0, expectedArticleCount);
                 setArticleReportVisible(false);
             }
         });
@@ -450,50 +450,19 @@ public class VenueController {
         articleLoadingTask = new Task<>() {
             @Override
             protected Void call() {
-                int lastArticleId = 0;
-
-                while (!stopArticleLoading && !isCancelled()) {
-                    List<Object> batch = new ArrayList<>();
-
-                    if (TYPE_JOURNAL.equals(venueType)) {
-                        batch.addAll(
-                                journalService.getJournalArticlesBatch(
-                                        venueId,
-                                        startYear,
-                                        endYear,
-                                        lastArticleId,
-                                        ARTICLE_BATCH_SIZE
-                                )
-                        );
-                    } else if (TYPE_CONFERENCE.equals(venueType)) {
-                        batch.addAll(
-                                conferenceService.getConferenceArticlesBatch(
-                                        venueId,
-                                        startYear,
-                                        endYear,
-                                        lastArticleId,
-                                        ARTICLE_BATCH_SIZE
-                                )
-                        );
-                    }
-
-                    if (batch.isEmpty()) {
-                        break;
-                    }
-
-                    Integer newLastArticleId = extractArticleId(batch.get(batch.size() - 1));
-
-                    if (newLastArticleId == null) {
-                        break;
-                    }
-
-                    lastArticleId = newLastArticleId;
-
-                    Platform.runLater(() -> {
-                        articleItems.addAll(batch);
-                        updateArticlesLoadedLabel(articleItems.size(), expectedArticleCount);
-                    });
-                }
+                venueService.loadVenueArticlesInBatches(
+                        venueType,
+                        venueId,
+                        startYear,
+                        endYear,
+                        0,
+                        ARTICLE_BATCH_SIZE,
+                        batch -> Platform.runLater(() -> {
+                            articleItems.addAll(batch);
+                            updateArticlesLoadedLabel(articleItems.size(), expectedArticleCount);
+                        }),
+                        () -> !stopArticleLoading && !isCancelled()
+                );
 
                 Platform.runLater(() ->
                         updateArticlesLoadedLabel(articleItems.size(), expectedArticleCount)
@@ -522,8 +491,19 @@ public class VenueController {
         }
     }
 
+    private void stopCurrentVenueSearch() {
+        if (venueSearchDebounce != null) {
+            venueSearchDebounce.stop();
+        }
+
+        if (venueSearchTask != null && venueSearchTask.isRunning()) {
+            venueSearchTask.cancel();
+        }
+    }
+
     @FXML
     private void clear() {
+        stopCurrentVenueSearch();
         stopCurrentArticleLoading();
 
         if (venueSearchField != null) {
@@ -546,10 +526,12 @@ public class VenueController {
         clearVenueResults();
         setSelectedVenue(null);
         clearResultArea();
+        setLoading(false);
     }
 
     @FXML
     private void backToHome() {
+        stopCurrentVenueSearch();
         stopCurrentArticleLoading();
 
         try {
@@ -573,14 +555,25 @@ public class VenueController {
             return;
         }
 
-        venueTypeComboBox.getItems().setAll(TYPE_JOURNAL, TYPE_CONFERENCE);
-        venueTypeComboBox.getSelectionModel().select(TYPE_JOURNAL);
+        venueTypeComboBox.getItems().setAll(
+                VenueService.TYPE_JOURNAL,
+                VenueService.TYPE_CONFERENCE
+        );
+        venueTypeComboBox.getSelectionModel().select(VenueService.TYPE_JOURNAL);
 
         venueTypeComboBox.setOnAction(event -> {
             stopCurrentArticleLoading();
+            stopCurrentVenueSearch();
+
             clearVenueResults();
             setSelectedVenue(null);
             clearResultArea();
+
+            String searchText = venueSearchField == null ? "" : venueSearchField.getText().trim();
+
+            if (searchText.length() >= MIN_VENUE_SEARCH_LENGTH && venueSearchDebounce != null) {
+                venueSearchDebounce.playFromStart();
+            }
         });
     }
 
@@ -637,9 +630,23 @@ public class VenueController {
     }
 
     private void setupSearchField() {
-        if (venueSearchField != null) {
-            venueSearchField.setOnAction(event -> searchVenues());
+        venueSearchDebounce = new PauseTransition(
+                Duration.millis(VENUE_SEARCH_DEBOUNCE_MS)
+        );
+
+        venueSearchDebounce.setOnFinished(event -> searchVenuesRealtime());
+
+        if (venueSearchField == null) {
+            return;
         }
+
+        venueSearchField.textProperty().addListener((observable, oldValue, newValue) -> {
+            if (venueSearchDebounce != null) {
+                venueSearchDebounce.playFromStart();
+            }
+        });
+
+        venueSearchField.setOnAction(event -> searchVenues());
     }
 
     private void setupVenueResultsListView() {
@@ -732,6 +739,8 @@ public class VenueController {
             articlesTable.setMaxHeight(340);
             articlesTable.setFixedCellSize(34);
             articlesTable.setItems(articleItems);
+
+            TableCopySupport.enableCellCopy(articlesTable);
         }
 
         if (yearColumn != null) {
@@ -744,126 +753,29 @@ public class VenueController {
             titleColumn.setCellValueFactory(cellData ->
                     new SimpleStringProperty(nullToDash(extractArticleTitle(cellData.getValue())))
             );
+            TableCopySupport.makeStringColumnTextSelectable(titleColumn);
         }
 
         if (authorsColumn != null) {
             authorsColumn.setCellValueFactory(cellData ->
                     new SimpleStringProperty(nullToDash(extractArticleAuthors(cellData.getValue())))
             );
+            TableCopySupport.makeStringColumnTextSelectable(authorsColumn);
         }
 
         if (pagesColumn != null) {
             pagesColumn.setCellValueFactory(cellData ->
                     new SimpleStringProperty(nullToDash(extractArticlePages(cellData.getValue())))
             );
+            TableCopySupport.makeStringColumnTextSelectable(pagesColumn);
         }
 
         if (urlColumn != null) {
             urlColumn.setCellValueFactory(cellData ->
                     new SimpleStringProperty(nullToDash(extractArticleUrlOrEe(cellData.getValue())))
             );
+            TableCopySupport.makeStringColumnTextSelectable(urlColumn);
         }
-    }
-
-    private List<Object> sortVenueResultsByRelevance(List<Object> results, String query) {
-        if (results == null || results.isEmpty()) {
-            return new ArrayList<>();
-        }
-
-        String normalizedQuery = normalizeSearchText(query);
-        List<Object> sortedResults = new ArrayList<>(results);
-
-        sortedResults.sort((first, second) -> {
-            int firstScore = venueRelevanceScore(first, normalizedQuery);
-            int secondScore = venueRelevanceScore(second, normalizedQuery);
-
-            if (firstScore != secondScore) {
-                return Integer.compare(firstScore, secondScore);
-            }
-
-            String firstTitle = normalizeSearchText(getVenueTitleForSearch(first));
-            String secondTitle = normalizeSearchText(getVenueTitleForSearch(second));
-
-            if (firstTitle.length() != secondTitle.length()) {
-                return Integer.compare(firstTitle.length(), secondTitle.length());
-            }
-
-            return firstTitle.compareTo(secondTitle);
-        });
-
-        return sortedResults;
-    }
-
-    private int venueRelevanceScore(Object venue, String query) {
-        String title = normalizeSearchText(getVenueTitleForSearch(venue));
-        String acronym = normalizeSearchText(getVenueAcronymForSearch(venue));
-        String displayName = normalizeSearchText(getVenueDisplayName(venue));
-
-        if (title.equals(query) || acronym.equals(query) || displayName.equals(query)) {
-            return 0;
-        }
-
-        if (title.startsWith(query) || acronym.startsWith(query) || displayName.startsWith(query)) {
-            return 1;
-        }
-
-        if (title.contains(query) || acronym.contains(query) || displayName.contains(query)) {
-            return 2;
-        }
-
-        if (containsAllQueryWords(title + " " + acronym + " " + displayName, query)) {
-            return 3;
-        }
-
-        return 4;
-    }
-
-    private boolean containsAllQueryWords(String text, String query) {
-        if (query == null || query.isBlank()) {
-            return true;
-        }
-
-        for (String word : query.split(" ")) {
-            if (!word.isBlank() && !text.contains(word)) {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    private String getVenueTitleForSearch(Object venue) {
-        if (venue instanceof JournalSearchResultDto journal) {
-            return journal.journalName();
-        }
-
-        if (venue instanceof ConferenceSearchResultDto conference) {
-            return conference.conferenceTitle();
-        }
-
-        return "";
-    }
-
-    private String getVenueAcronymForSearch(Object venue) {
-        if (venue instanceof ConferenceSearchResultDto conference) {
-            return conference.acronym();
-        }
-
-        return "";
-    }
-
-    private String normalizeSearchText(String text) {
-        if (text == null) {
-            return "";
-        }
-
-        String normalized = Normalizer.normalize(text, Normalizer.Form.NFD)
-                .replaceAll("\\p{M}", "");
-
-        return normalized.toLowerCase(Locale.ROOT)
-                .trim()
-                .replaceAll("[^\\p{L}\\p{Nd}]+", " ")
-                .replaceAll("\\s+", " ");
     }
 
     private void renderVenueResults(List<Object> results) {
@@ -1191,11 +1103,6 @@ public class VenueController {
         return Math.ceil(upperBound / 10.0);
     }
 
-    private void updateArticlesTable(List<Object> articles) {
-        articleItems.setAll(articles);
-        updateArticlesLoadedLabel(articleItems.size(), expectedArticleCount);
-    }
-
     private void clearResultArea() {
         setLabelText(rankingLabel, "-");
         setLabelText(categoryLabel, "-");
@@ -1251,56 +1158,8 @@ public class VenueController {
         return comboBox.getValue();
     }
 
-    private int getJournalId(Object venue) {
-        if (venue instanceof JournalSearchResultDto journal) {
-            if (journal.journalId() != null && journal.journalId() > 0) {
-                return journal.journalId();
-            }
-        }
-
-        throw new IllegalArgumentException("Δεν βρέθηκε έγκυρο journalId για το επιλεγμένο journal.");
-    }
-
-    private int getConferenceId(Object venue) {
-        if (venue instanceof ConferenceSearchResultDto conference) {
-            if (conference.conferenceId() != null && conference.conferenceId() > 0) {
-                return conference.conferenceId();
-            }
-        }
-
-        throw new IllegalArgumentException("Δεν βρέθηκε έγκυρο conferenceId για το επιλεγμένο conference.");
-    }
-
     private String getVenueDisplayName(Object venue) {
-        if (venue instanceof JournalSearchResultDto journal) {
-            if (journal.journalName() != null && !journal.journalName().isBlank()) {
-                if (journal.publisherName() != null && !journal.publisherName().isBlank()) {
-                    return journal.journalName() + " (" + journal.publisherName() + ")";
-                }
-
-                return journal.journalName();
-            }
-
-            return "Journal #" + journal.journalId();
-        }
-
-        if (venue instanceof ConferenceSearchResultDto conference) {
-            if (conference.acronym() != null && !conference.acronym().isBlank()) {
-                if (conference.conferenceTitle() != null && !conference.conferenceTitle().isBlank()) {
-                    return conference.acronym() + " - " + conference.conferenceTitle();
-                }
-
-                return conference.acronym();
-            }
-
-            if (conference.conferenceTitle() != null && !conference.conferenceTitle().isBlank()) {
-                return conference.conferenceTitle();
-            }
-
-            return "Conference #" + conference.conferenceId();
-        }
-
-        return "Unknown venue";
+        return venueService.getVenueDisplayName(venue);
     }
 
     private String buildJournalRankText(JournalRankingDto ranking) {
@@ -1369,18 +1228,6 @@ public class VenueController {
         return null;
     }
 
-    private Integer extractArticleId(Object article) {
-        if (article instanceof JournalArticleDto journalArticle) {
-            return journalArticle.articleId();
-        }
-
-        if (article instanceof ConferenceArticleDto conferenceArticle) {
-            return conferenceArticle.articleId();
-        }
-
-        return null;
-    }
-
     private Integer extractArticleYear(Object article) {
         if (article instanceof JournalArticleDto journalArticle) {
             return journalArticle.year();
@@ -1431,26 +1278,14 @@ public class VenueController {
 
     private String extractArticleUrlOrEe(Object article) {
         if (article instanceof JournalArticleDto journalArticle) {
-            return firstNonBlank(journalArticle.url(), journalArticle.ee());
+            return firstNonBlank(journalArticle.ee(), journalArticle.url());
         }
 
         if (article instanceof ConferenceArticleDto conferenceArticle) {
-            return firstNonBlank(conferenceArticle.url(), conferenceArticle.ee());
+            return firstNonBlank(conferenceArticle.ee(), conferenceArticle.url());
         }
 
         return null;
-    }
-
-    private long getExpectedArticleCount(Object profile) {
-        if (profile instanceof JournalProfileDto journalProfile) {
-            return defaultLong(journalProfile.totalArticles());
-        }
-
-        if (profile instanceof ConferenceProfileDto conferenceProfile) {
-            return defaultLong(conferenceProfile.totalArticles());
-        }
-
-        return 0;
     }
 
     private void updateArticlesLoadedLabel(long loaded, long total) {
@@ -1566,14 +1401,6 @@ public class VenueController {
     private record YearRange(
             Integer startYear,
             Integer endYear
-    ) {
-    }
-
-    private record VenuePageData(
-            String venueType,
-            Object profile,
-            Object ranking,
-            List<Object> yearlyStats
     ) {
     }
 }

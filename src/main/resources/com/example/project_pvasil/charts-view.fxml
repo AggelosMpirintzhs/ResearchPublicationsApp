@@ -1,15 +1,20 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
 <?import javafx.geometry.Insets?>
+<?import javafx.scene.chart.BarChart?>
+<?import javafx.scene.chart.CategoryAxis?>
 <?import javafx.scene.chart.LineChart?>
 <?import javafx.scene.chart.NumberAxis?>
+<?import javafx.scene.chart.ScatterChart?>
 <?import javafx.scene.control.Button?>
+<?import javafx.scene.control.CheckBox?>
 <?import javafx.scene.control.ComboBox?>
 <?import javafx.scene.control.Label?>
 <?import javafx.scene.control.ListView?>
 <?import javafx.scene.control.ScrollPane?>
 <?import javafx.scene.control.TextField?>
 <?import javafx.scene.layout.BorderPane?>
+<?import javafx.scene.layout.FlowPane?>
 <?import javafx.scene.layout.HBox?>
 <?import javafx.scene.layout.Region?>
 <?import javafx.scene.layout.StackPane?>
@@ -20,7 +25,6 @@
             fx:controller="controllers.ChartsController"
             styleClass="root-pane">
 
-    <!-- ================= TOP BAR ================= -->
     <top>
         <HBox spacing="16" alignment="CENTER_LEFT" styleClass="top-bar">
             <padding>
@@ -44,7 +48,6 @@
         </HBox>
     </top>
 
-    <!-- ================= CONTENT ================= -->
     <center>
         <ScrollPane fitToWidth="true"
                     hbarPolicy="NEVER"
@@ -54,22 +57,22 @@
             <content>
                 <StackPane alignment="TOP_CENTER">
                     <padding>
-                        <Insets top="28" right="42" bottom="44" left="42"/>
+                        <Insets top="24" right="24" bottom="40" left="24"/>
                     </padding>
 
                     <VBox spacing="22"
                           alignment="TOP_CENTER"
-                          maxWidth="1200">
+                          maxWidth="1500">
 
                         <!-- ================= HERO ================= -->
                         <VBox spacing="10"
                               styleClass="venue-hero-card"
-                              maxWidth="1200">
+                              maxWidth="1500">
 
                             <Label text="Targeted Charts"
                                    styleClass="venue-hero-title"/>
 
-                            <Label text="Select journals or conferences and compare their yearly publication activity, author entries or distinct authors through a shared line chart."
+                            <Label text="Select journals or conferences, choose metrics and display only the charts you want to analyze."
                                    wrapText="true"
                                    styleClass="venue-hero-subtitle"/>
                         </VBox>
@@ -77,90 +80,84 @@
                         <!-- ================= FILTERS ================= -->
                         <VBox spacing="16"
                               styleClass="filter-card"
-                              maxWidth="1200">
+                              maxWidth="1500">
 
                             <VBox spacing="5">
                                 <Label text="Chart Filters"
                                        styleClass="content-title"/>
 
-                                <Label text="Search journals or conferences, add one or more venues to the selected list, choose a metric and optionally restrict the chart to a year range."
+                                <Label text="Search journals or conferences, add one or more venues to the selected list, choose metrics and optionally restrict the charts to a year range."
                                        wrapText="true"
                                        styleClass="stat-muted"/>
                             </VBox>
 
-                            <HBox spacing="12" alignment="CENTER_LEFT" styleClass="form-row">
-                                <ComboBox fx:id="venueTypeComboBox"
-                                          promptText="Journal / Conference"
-                                          prefWidth="205"
-                                          styleClass="form-control"/>
+                            <VBox spacing="0"
+                                  styleClass="google-search-shell">
 
-                                <TextField fx:id="venueSearchField"
-                                           promptText="Search venue"
-                                           prefWidth="340"
-                                           styleClass="form-control"/>
+                                <HBox spacing="10"
+                                      alignment="CENTER_LEFT"
+                                      styleClass="google-search-main-row">
 
-                                <Button fx:id="searchButton"
-                                        text="Search"
-                                        onAction="#searchVenues"
-                                        styleClass="primary-button"/>
+                                    <Label text="⌕"
+                                           styleClass="google-search-icon"/>
 
-                                <Button fx:id="addSelectedButton"
-                                        text="Add Selected"
-                                        onAction="#addSelectedVenue"
-                                        styleClass="primary-button"/>
+                                    <TextField fx:id="venueSearchField"
+                                               promptText="Search journals or conferences"
+                                               HBox.hgrow="ALWAYS"
+                                               styleClass="google-search-input"/>
+                                    
+                                    <ComboBox fx:id="venueTypeComboBox"
+                                              promptText="Journal / Conference"
+                                              prefWidth="190"
+                                              styleClass="google-search-combo"/>
 
-                                <Button fx:id="clearButton"
-                                        text="Clear"
-                                        onAction="#clear"
-                                        styleClass="secondary-button"/>
-                            </HBox>
+                                    <Button fx:id="addSelectedButton"
+                                            text="Add"
+                                            onAction="#addSelectedVenue"
+                                            styleClass="google-search-button"/>
 
-                            <HBox spacing="16"
-                                  alignment="TOP_CENTER">
+                                    <Button fx:id="clearButton"
+                                            text="Clear"
+                                            onAction="#clear"
+                                            styleClass="google-secondary-button"/>
+                                </HBox>
 
                                 <VBox fx:id="searchResultsContainer"
-                                      spacing="10"
+                                      spacing="6"
                                       visible="false"
                                       managed="false"
-                                      HBox.hgrow="ALWAYS"
-                                      styleClass="venue-results-panel">
+                                      styleClass="google-suggestions-panel">
 
-                                    <HBox alignment="CENTER_LEFT" spacing="10">
-                                        <VBox spacing="2" HBox.hgrow="ALWAYS">
-                                            <Label text="Matching results"
-                                                   styleClass="venue-results-title"/>
-
-                                            <Label text="Select one result and add it to the comparison list."
-                                                   styleClass="venue-results-subtitle"/>
-                                        </VBox>
-
-                                        <Label text="SCROLL"
-                                               styleClass="small-blue-chip"/>
-                                    </HBox>
+                                    <Label text="Suggested results"
+                                           styleClass="google-suggestions-header"/>
 
                                     <ListView fx:id="searchResultsListView"
                                               prefHeight="160"
                                               minHeight="160"
                                               maxHeight="160"
-                                              styleClass="venue-results-list"/>
+                                              styleClass="google-suggestions-list"/>
                                 </VBox>
+                            </VBox>
 
-                                <VBox spacing="8"
-                                      HBox.hgrow="ALWAYS">
-                                    <Label text="Selected venues"
-                                           styleClass="venue-results-title"/>
+                            <VBox spacing="8"
+                                  maxWidth="1500">
 
-                                    <ListView fx:id="selectedVenuesListView"
-                                              prefHeight="160"
-                                              minHeight="160"
-                                              maxHeight="160"
-                                              styleClass="venue-results-list"/>
-                                </VBox>
-                            </HBox>
+                                <Label text="Selected venues"
+                                       styleClass="venue-results-title"/>
 
-                            <HBox spacing="12" alignment="CENTER_LEFT" styleClass="form-row">
+                                <ListView fx:id="selectedVenuesListView"
+                                          prefHeight="150"
+                                          minHeight="150"
+                                          maxHeight="150"
+                                          styleClass="venue-results-list"/>
+                            </VBox>
+
+                            <HBox spacing="12"
+                                  alignment="CENTER_LEFT"
+                                  styleClass="google-search-filters-row">
+
                                 <ComboBox fx:id="metricComboBox"
-                                          promptText="Metric"
+                                          promptText="Line metric"
                                           prefWidth="220"
                                           styleClass="form-control"/>
 
@@ -175,7 +172,7 @@
                                           styleClass="form-control"/>
 
                                 <Button fx:id="loadChartButton"
-                                        text="Load Chart"
+                                        text="Load Charts"
                                         onAction="#loadChart"
                                         styleClass="primary-button"/>
 
@@ -183,13 +180,42 @@
                                         text="Remove Selected"
                                         onAction="#removeSelectedVenue"
                                         styleClass="secondary-button"/>
+
+                                <Label text="To year must be ≥ From year"
+                                       styleClass="hint-label"/>
+                            </HBox>
+
+                            <HBox spacing="12"
+                                  alignment="CENTER_LEFT"
+                                  styleClass="google-search-filters-row">
+
+                                <Label text="Show charts:"
+                                       styleClass="selected-value"/>
+
+                                <CheckBox fx:id="showLineChartCheckBox"
+                                          text="Line chart"
+                                          selected="true"
+                                          styleClass="load-articles-toggle"/>
+
+                                <CheckBox fx:id="showBarChartCheckBox"
+                                          text="Bar chart"
+                                          selected="true"
+                                          styleClass="load-articles-toggle"/>
+
+                                <CheckBox fx:id="showScatterChartCheckBox"
+                                          text="Scatter plot"
+                                          selected="true"
+                                          styleClass="load-articles-toggle"/>
                             </HBox>
                         </VBox>
 
                         <!-- ================= LINE CHART ================= -->
-                        <VBox spacing="16"
+                        <VBox fx:id="lineChartPanel"
+                              spacing="16"
                               styleClass="dashboard-panel charts-dashboard"
-                              maxWidth="1200">
+                              maxWidth="1500"
+                              visible="${showLineChartCheckBox.selected}"
+                              managed="${showLineChartCheckBox.selected}">
 
                             <HBox alignment="CENTER_LEFT">
                                 <VBox spacing="4" HBox.hgrow="ALWAYS">
@@ -207,7 +233,7 @@
 
                             <VBox spacing="8"
                                   styleClass="chart-card"
-                                  maxWidth="1200">
+                                  maxWidth="1500">
 
                                 <LineChart fx:id="comparisonLineChart"
                                            title=""
@@ -215,7 +241,7 @@
                                            minHeight="410"
                                            animated="false"
                                            createSymbols="true"
-                                           legendVisible="true"
+                                           legendVisible="false"
                                            horizontalGridLinesVisible="true"
                                            verticalGridLinesVisible="true"
                                            alternativeRowFillVisible="false"
@@ -241,12 +267,262 @@
                                     </yAxis>
                                 </LineChart>
                             </VBox>
+
+                            <VBox fx:id="lineChartLegendBox"
+                                  spacing="8"
+                                  styleClass="chart-card"
+                                  maxWidth="1500"
+                                  visible="false"
+                                  managed="false">
+
+                                <Label text="Legend"
+                                       styleClass="chart-card-title"/>
+
+                                <FlowPane fx:id="lineChartLegendFlow"
+                                          hgap="10"
+                                          vgap="8"
+                                          prefWrapLength="1200"
+                                          maxWidth="1500"/>
+                            </VBox>
                         </VBox>
 
+                        <!-- ================= BAR CHARTS ================= -->
+                        <VBox fx:id="barChartPanel"
+                              spacing="16"
+                              styleClass="dashboard-panel charts-dashboard"
+                              maxWidth="1500"
+                              visible="${showBarChartCheckBox.selected}"
+                              managed="${showBarChartCheckBox.selected}">
+
+                            <HBox alignment="CENTER_LEFT">
+                                <VBox spacing="4" HBox.hgrow="ALWAYS">
+                                    <Label text="Venue Comparison Bar Charts"
+                                           styleClass="content-title"/>
+
+                                    <Label text="Each comparison metric is displayed in a separate chart, so the results are easier to read."
+                                           wrapText="true"
+                                           maxWidth="Infinity"
+                                           minHeight="-Infinity"
+                                           styleClass="stat-muted"/>
+                                </VBox>
+
+                                <Label text="BAR CHARTS"
+                                       styleClass="small-blue-chip"/>
+                            </HBox>
+
+                            <HBox spacing="14"
+                                  alignment="TOP_CENTER"
+                                  maxWidth="1500"
+                                  styleClass="charts-row">
+
+                                <VBox spacing="8"
+                                      styleClass="chart-card"
+                                      HBox.hgrow="ALWAYS"
+                                      minWidth="320"
+                                      maxWidth="Infinity">
+
+                                    <Label text="Total Articles"
+                                           styleClass="chart-card-title"/>
+
+                                    <BarChart fx:id="totalArticlesBarChart"
+                                              title=""
+                                              prefHeight="330"
+                                              minHeight="320"
+                                              animated="false"
+                                              legendVisible="false"
+                                              horizontalGridLinesVisible="true"
+                                              verticalGridLinesVisible="false"
+                                              alternativeRowFillVisible="false"
+                                              alternativeColumnFillVisible="false"
+                                              styleClass="beautiful-line-chart">
+
+                                        <xAxis>
+                                            <CategoryAxis fx:id="totalArticlesCategoryAxis"
+                                                          label=""/>
+                                        </xAxis>
+
+                                        <yAxis>
+                                            <NumberAxis fx:id="totalArticlesValueAxis"
+                                                        label="Total articles"
+                                                        forceZeroInRange="true"
+                                                        minorTickVisible="false"
+                                                        tickLabelsVisible="true"
+                                                        tickMarkVisible="true"/>
+                                        </yAxis>
+                                    </BarChart>
+                                </VBox>
+
+                                <VBox spacing="8"
+                                      styleClass="chart-card"
+                                      HBox.hgrow="ALWAYS"
+                                      minWidth="320"
+                                      maxWidth="Infinity">
+
+                                    <Label text="Avg Articles / Year"
+                                           styleClass="chart-card-title"/>
+
+                                    <BarChart fx:id="avgArticlesBarChart"
+                                              title=""
+                                              prefHeight="330"
+                                              minHeight="320"
+                                              animated="false"
+                                              legendVisible="false"
+                                              horizontalGridLinesVisible="true"
+                                              verticalGridLinesVisible="false"
+                                              alternativeRowFillVisible="false"
+                                              alternativeColumnFillVisible="false"
+                                              styleClass="beautiful-line-chart">
+
+                                        <xAxis>
+                                            <CategoryAxis fx:id="avgArticlesCategoryAxis"
+                                                          label=""/>
+                                        </xAxis>
+
+                                        <yAxis>
+                                            <NumberAxis fx:id="avgArticlesValueAxis"
+                                                        label="Avg articles / year"
+                                                        forceZeroInRange="true"
+                                                        minorTickVisible="false"
+                                                        tickLabelsVisible="true"
+                                                        tickMarkVisible="true"/>
+                                        </yAxis>
+                                    </BarChart>
+                                </VBox>
+
+                                <VBox spacing="8"
+                                      styleClass="chart-card"
+                                      HBox.hgrow="ALWAYS"
+                                      minWidth="320"
+                                      maxWidth="Infinity">
+
+                                    <Label text="Avg Author Entries / Year"
+                                           styleClass="chart-card-title"/>
+
+                                    <BarChart fx:id="avgAuthorEntriesBarChart"
+                                              title=""
+                                              prefHeight="330"
+                                              minHeight="320"
+                                              animated="false"
+                                              legendVisible="false"
+                                              horizontalGridLinesVisible="true"
+                                              verticalGridLinesVisible="false"
+                                              alternativeRowFillVisible="false"
+                                              alternativeColumnFillVisible="false"
+                                              styleClass="beautiful-line-chart">
+
+                                        <xAxis>
+                                            <CategoryAxis fx:id="avgAuthorEntriesCategoryAxis"
+                                                          label=""/>
+                                        </xAxis>
+
+                                        <yAxis>
+                                            <NumberAxis fx:id="avgAuthorEntriesValueAxis"
+                                                        label="Avg author entries / year"
+                                                        forceZeroInRange="true"
+                                                        minorTickVisible="false"
+                                                        tickLabelsVisible="true"
+                                                        tickMarkVisible="true"/>
+                                        </yAxis>
+                                    </BarChart>
+                                </VBox>
+                            </HBox>
+
+                            <VBox fx:id="barChartsLegendBox"
+                                  spacing="8"
+                                  styleClass="chart-card"
+                                  maxWidth="1500"
+                                  visible="false"
+                                  managed="false">
+
+                                <Label text="Legend"
+                                       styleClass="chart-card-title"/>
+
+                                <FlowPane fx:id="barChartsLegendFlow"
+                                          hgap="10"
+                                          vgap="8"
+                                          prefWrapLength="1200"
+                                          maxWidth="1500"/>
+                            </VBox>
+                        </VBox>
+
+                        <!-- ================= SCATTER PLOT ================= -->
+                        <VBox fx:id="scatterChartPanel"
+                              spacing="16"
+                              styleClass="dashboard-panel charts-dashboard"
+                              maxWidth="1500"
+                              visible="${showScatterChartCheckBox.selected}"
+                              managed="${showScatterChartCheckBox.selected}">
+
+                            <HBox alignment="CENTER_LEFT">
+                                <VBox spacing="4" HBox.hgrow="ALWAYS">
+                                    <Label text="Articles vs Average Authors Scatter Plot"
+                                           styleClass="content-title"/>
+
+                                    <Label text="Each selected journal or conference is displayed as a point, combining total publications and average author activity."
+                                           wrapText="true"
+                                           styleClass="stat-muted"/>
+                                </VBox>
+
+                                <Label text="SCATTER PLOT"
+                                       styleClass="small-blue-chip"/>
+                            </HBox>
+
+                            <VBox spacing="8"
+                                  styleClass="chart-card"
+                                  maxWidth="1500">
+
+                                <ScatterChart fx:id="venueScatterChart"
+                                              title=""
+                                              prefHeight="430"
+                                              minHeight="410"
+                                              animated="false"
+                                              legendVisible="false"
+                                              horizontalGridLinesVisible="true"
+                                              verticalGridLinesVisible="true"
+                                              alternativeRowFillVisible="false"
+                                              alternativeColumnFillVisible="false"
+                                              styleClass="beautiful-line-chart">
+
+                                    <xAxis>
+                                        <NumberAxis fx:id="scatterArticlesAxis"
+                                                    label="Total articles"
+                                                    forceZeroInRange="true"
+                                                    minorTickVisible="false"
+                                                    tickLabelsVisible="true"
+                                                    tickMarkVisible="true"/>
+                                    </xAxis>
+
+                                    <yAxis>
+                                        <NumberAxis fx:id="scatterAuthorsAxis"
+                                                    label="Avg author entries / year"
+                                                    forceZeroInRange="true"
+                                                    minorTickVisible="false"
+                                                    tickLabelsVisible="true"
+                                                    tickMarkVisible="true"/>
+                                    </yAxis>
+                                </ScatterChart>
+                            </VBox>
+
+                            <VBox fx:id="scatterLegendBox"
+                                  spacing="8"
+                                  styleClass="chart-card"
+                                  maxWidth="1500"
+                                  visible="false"
+                                  managed="false">
+
+                                <Label text="Legend"
+                                       styleClass="chart-card-title"/>
+
+                                <FlowPane fx:id="scatterLegendFlow"
+                                          hgap="10"
+                                          vgap="8"
+                                          prefWrapLength="1200"
+                                          maxWidth="1500"/>
+                            </VBox>
+                        </VBox>
                     </VBox>
                 </StackPane>
             </content>
         </ScrollPane>
     </center>
-
 </BorderPane>

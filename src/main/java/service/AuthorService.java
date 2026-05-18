@@ -7,8 +7,13 @@ import dto.author.AuthorYearlyStatsByTypeDto;
 import dto.author.AuthorYearlyStatsDto;
 import repository.AuthorRepository;
 
+import java.text.Normalizer;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
+import java.util.function.BooleanSupplier;
+import java.util.function.Consumer;
 
 public class AuthorService {
 
@@ -29,6 +34,10 @@ public class AuthorService {
         this.authorRepository = new AuthorRepository();
     }
 
+    public AuthorService(AuthorRepository authorRepository) {
+        this.authorRepository = authorRepository;
+    }
+
     public List<AuthorSearchResultDto> searchAuthors(String searchText, Integer limit) {
         String normalizedSearchText = normalizeSearchText(searchText);
 
@@ -38,7 +47,97 @@ public class AuthorService {
 
         int safeLimit = normalizeSearchLimit(limit);
 
-        return authorRepository.searchAuthors(normalizedSearchText, safeLimit);
+        List<AuthorSearchResultDto> results =
+                authorRepository.searchAuthors(normalizedSearchText, safeLimit);
+
+        return sortAuthorsByRelevance(results, normalizedSearchText);
+    }
+
+    public AuthorPageData loadAuthorPageData(
+            int authorId,
+            Integer startYear,
+            Integer endYear
+    ) {
+        validateId(authorId, "authorId");
+
+        YearRange yearRange = normalizeYearRange(startYear, endYear);
+
+        Optional<AuthorProfileDto> profile =
+                authorRepository.findAuthorProfile(
+                        authorId,
+                        yearRange.startYear(),
+                        yearRange.endYear()
+                );
+
+        List<AuthorYearlyStatsDto> yearlyStats =
+                authorRepository.findAuthorYearlyStats(
+                        authorId,
+                        yearRange.startYear(),
+                        yearRange.endYear()
+                );
+
+        List<AuthorYearlyStatsByTypeDto> yearlyStatsByType =
+                authorRepository.findAuthorYearlyStatsByType(
+                        authorId,
+                        yearRange.startYear(),
+                        yearRange.endYear()
+                );
+
+        return new AuthorPageData(
+                profile.orElse(null),
+                yearlyStats,
+                yearlyStatsByType
+        );
+    }
+
+    public void loadAuthorPublicationsInBatches(
+            int authorId,
+            Integer startYear,
+            Integer endYear,
+            Integer lastArticleId,
+            Integer batchSize,
+            Consumer<List<AuthorPublicationDto>> onBatchLoaded,
+            BooleanSupplier shouldContinue
+    ) {
+        validateId(authorId, "authorId");
+
+        if (onBatchLoaded == null) {
+            throw new IllegalArgumentException("Το onBatchLoaded δεν μπορεί να είναι null.");
+        }
+
+        if (shouldContinue == null) {
+            throw new IllegalArgumentException("Το shouldContinue δεν μπορεί να είναι null.");
+        }
+
+        YearRange yearRange = normalizeYearRange(startYear, endYear);
+
+        int safeLastArticleId = normalizeLastArticleId(lastArticleId);
+        int safeBatchSize = normalizeBatchSize(batchSize);
+
+        while (shouldContinue.getAsBoolean()) {
+            List<AuthorPublicationDto> batch =
+                    authorRepository.findAuthorPublicationsBatch(
+                            authorId,
+                            yearRange.startYear(),
+                            yearRange.endYear(),
+                            safeLastArticleId,
+                            safeBatchSize
+                    );
+
+            if (batch.isEmpty()) {
+                break;
+            }
+
+            onBatchLoaded.accept(batch);
+
+            AuthorPublicationDto lastPublication = batch.get(batch.size() - 1);
+
+            if (lastPublication.articleId() == null) {
+                break;
+            }
+
+            safeLastArticleId = lastPublication.articleId();
+        }
     }
 
     public Optional<AuthorProfileDto> getAuthorProfile(
@@ -112,13 +211,86 @@ public class AuthorService {
         );
     }
 
+    private List<AuthorSearchResultDto> sortAuthorsByRelevance(
+            List<AuthorSearchResultDto> results,
+            String normalizedQuery
+    ) {
+        if (results == null || results.isEmpty()) {
+            return new ArrayList<>();
+        }
+
+        List<AuthorSearchResultDto> sortedResults = new ArrayList<>(results);
+
+        sortedResults.sort((first, second) -> {
+            int firstScore = authorRelevanceScore(first, normalizedQuery);
+            int secondScore = authorRelevanceScore(second, normalizedQuery);
+
+            if (firstScore != secondScore) {
+                return Integer.compare(firstScore, secondScore);
+            }
+
+            String firstName = normalizeSearchText(first.authorName());
+            String secondName = normalizeSearchText(second.authorName());
+
+            if (firstName.length() != secondName.length()) {
+                return Integer.compare(firstName.length(), secondName.length());
+            }
+
+            return firstName.compareTo(secondName);
+        });
+
+        return sortedResults;
+    }
+
+    private int authorRelevanceScore(AuthorSearchResultDto author, String query) {
+        String name = normalizeSearchText(author == null ? null : author.authorName());
+
+        if (name.equals(query)) {
+            return 0;
+        }
+
+        if (name.startsWith(query)) {
+            return 1;
+        }
+
+        if (name.contains(" " + query)) {
+            return 2;
+        }
+
+        if (name.contains(query)) {
+            return 3;
+        }
+
+        if (containsAllQueryWords(name, query)) {
+            return 4;
+        }
+
+        return 5;
+    }
+
+    private boolean containsAllQueryWords(String text, String query) {
+        if (query == null || query.isBlank()) {
+            return true;
+        }
+
+        for (String word : query.split(" ")) {
+            if (!word.isBlank() && !text.contains(word)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     private String normalizeSearchText(String searchText) {
         if (searchText == null) {
             return "";
         }
 
-        return searchText
-                .toLowerCase()
+        String normalized = Normalizer.normalize(searchText, Normalizer.Form.NFD)
+                .replaceAll("\\p{M}", "");
+
+        return normalized.toLowerCase(Locale.ROOT)
                 .trim()
                 .replaceAll("[^\\p{L}\\p{Nd}]+", " ")
                 .replaceAll("\\s+", " ");
@@ -173,5 +345,23 @@ public class AuthorService {
             int startYear,
             int endYear
     ) {
+    }
+
+    public record AuthorPageData(
+            AuthorProfileDto profile,
+            List<AuthorYearlyStatsDto> yearlyStats,
+            List<AuthorYearlyStatsByTypeDto> yearlyStatsByType
+    ) {
+        public boolean hasProfile() {
+            return profile != null;
+        }
+
+        public long expectedPublicationCount() {
+            if (profile == null || profile.totalArticles() == null) {
+                return 0L;
+            }
+
+            return profile.totalArticles();
+        }
     }
 }
