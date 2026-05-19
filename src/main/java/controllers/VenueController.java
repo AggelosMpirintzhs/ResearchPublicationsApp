@@ -36,6 +36,7 @@ import javafx.scene.layout.VBox;
 import javafx.util.Duration;
 import service.VenueService;
 import util.TableCopySupport;
+import util.TableSearchSupport;
 
 import java.io.IOException;
 import java.time.LocalDate;
@@ -54,6 +55,9 @@ public class VenueController {
 
     private static final int ARTICLE_BATCH_SIZE = 1000;
 
+    private static final String SEARCH_MODE_TITLE = "Title";
+    private static final String SEARCH_MODE_AUTHOR = "Author";
+
     private final VenueService venueService = new VenueService();
 
     private final ObservableList<Object> articleItems =
@@ -70,6 +74,12 @@ public class VenueController {
     private Task<Void> articleLoadingTask;
 
     private long expectedArticleCount = 0;
+
+    /*
+     * The in-table search logic is now handled by TableSearchSupport.
+     * This keeps the controller smaller and avoids duplicate search/highlight code.
+     */
+    private TableSearchSupport<Object> articleSearchSupport;
 
     @FXML
     private ComboBox<String> venueTypeComboBox;
@@ -171,6 +181,18 @@ public class VenueController {
     private VBox articleReportPanel;
 
     @FXML
+    private ComboBox<String> articleSearchModeComboBox;
+
+    @FXML
+    private TextField articleSearchField;
+
+    @FXML
+    private Button articleSearchNextButton;
+
+    @FXML
+    private Label articleSearchStatusLabel;
+
+    @FXML
     private TableView<Object> articlesTable;
 
     @FXML
@@ -198,6 +220,7 @@ public class VenueController {
         setupSearchField();
         setupVenueResultsListView();
         setupArticlesTable();
+        setupArticleSearchSupport();
         setupLoadArticlesOption();
         setupYearlyCharts();
 
@@ -235,7 +258,7 @@ public class VenueController {
 
         if (venueType == null || venueType.isBlank()) {
             if (showAlerts) {
-                showError("Δεν επιλέχθηκε τύπος", "Πρέπει πρώτα να επιλέξεις Journal ή Conference.");
+                showError("No venue type selected", "You must select Journal or Conference first.");
             }
 
             return;
@@ -248,15 +271,15 @@ public class VenueController {
 
             if (showAlerts && !searchText.isBlank()) {
                 showError(
-                        "Λάθος αναζήτηση",
-                        "Πρέπει να γράψεις τουλάχιστον 3 χαρακτήρες."
+                        "Invalid search",
+                        "You must type at least 3 characters."
                 );
             }
 
             if (showAlerts && searchText.isBlank()) {
                 showError(
-                        "Λάθος αναζήτηση",
-                        "Πρέπει να γράψεις όνομα journal ή conference."
+                        "Invalid search",
+                        "You must type a journal or conference name."
                 );
             }
 
@@ -309,8 +332,8 @@ public class VenueController {
 
             if (results.isEmpty() && showAlerts) {
                 showInfo(
-                        "Δεν βρέθηκαν αποτελέσματα",
-                        "Δεν βρέθηκε journal/conference με αυτό το κείμενο αναζήτησης."
+                        "No results found",
+                        "No journal or conference was found for this search text."
                 );
             }
         });
@@ -327,7 +350,7 @@ public class VenueController {
             }
 
             if (showAlerts) {
-                showError("Σφάλμα αναζήτησης", exception == null ? null : exception.getMessage());
+                showError("Venue search error", exception == null ? null : exception.getMessage());
             } else {
                 clearVenueResults();
             }
@@ -340,18 +363,19 @@ public class VenueController {
     private void loadVenueProfile() {
         stopCurrentVenueSearch();
         stopCurrentArticleLoading();
+        resetArticleSearchNavigation();
 
         String venueType = getSelectedVenueType();
 
         if (venueType == null || venueType.isBlank()) {
-            showError("Δεν επιλέχθηκε τύπος", "Πρέπει πρώτα να επιλέξεις Journal ή Conference.");
+            showError("No venue type selected", "You must select Journal or Conference first.");
             return;
         }
 
         if (selectedVenue == null) {
             showError(
-                    "Δεν επιλέχθηκε venue",
-                    "Πρέπει πρώτα να κάνεις αναζήτηση και να επιλέξεις ένα αποτέλεσμα από τη λίστα."
+                    "No venue selected",
+                    "You must search and select a venue from the results list first."
             );
             return;
         }
@@ -361,7 +385,7 @@ public class VenueController {
         try {
             yearRange = getSelectedYearRange();
         } catch (IllegalArgumentException exception) {
-            showError("Λάθος χρονιές", exception.getMessage());
+            showError("Invalid year range", exception.getMessage());
             return;
         }
 
@@ -390,17 +414,12 @@ public class VenueController {
             if (!data.hasAnyData()) {
                 clearResultArea();
                 showInfo(
-                        "Δεν βρέθηκαν δεδομένα",
-                        "Δεν υπάρχουν διαθέσιμα δεδομένα για το επιλεγμένο venue."
+                        "No data found",
+                        "There is no available data for the selected venue."
                 );
                 return;
             }
 
-            /*
-             * Αν δεν υπάρχει profile, σημαίνει ότι δεν υπάρχουν άρθρα
-             * στο συγκεκριμένο venue/range. Όμως μπορεί να υπάρχει ranking,
-             * οπότε το εμφανίζουμε κανονικά.
-             */
             updateProfileLabels(data.profile());
             updateRankingPanel(data.ranking());
             updateYearlyLineCharts(data.yearlyStats());
@@ -409,6 +428,8 @@ public class VenueController {
 
             if (shouldLoadArticles && data.hasArticleData()) {
                 articleItems.clear();
+                resetArticleSearchNavigation();
+
                 setArticleReportVisible(true);
                 updateArticlesLoadedLabel(0, expectedArticleCount);
 
@@ -420,6 +441,8 @@ public class VenueController {
                 );
             } else {
                 articleItems.clear();
+                resetArticleSearchNavigation();
+
                 updateArticlesLoadedLabel(0, expectedArticleCount);
                 setArticleReportVisible(false);
             }
@@ -428,7 +451,7 @@ public class VenueController {
         task.setOnFailed(event -> {
             setLoading(false);
             Throwable exception = task.getException();
-            showError("Σφάλμα φόρτωσης", exception == null ? null : exception.getMessage());
+            showError("Venue profile loading error", exception == null ? null : exception.getMessage());
         });
 
         startBackgroundTask(task, "venue-profile-task");
@@ -443,6 +466,8 @@ public class VenueController {
         stopCurrentArticleLoading();
 
         articleItems.clear();
+        resetArticleSearchNavigation();
+
         stopArticleLoading = false;
 
         updateArticlesLoadedLabel(0, expectedArticleCount);
@@ -460,13 +485,23 @@ public class VenueController {
                         batch -> Platform.runLater(() -> {
                             articleItems.addAll(batch);
                             updateArticlesLoadedLabel(articleItems.size(), expectedArticleCount);
+
+                            if (articleSearchSupport != null) {
+                                articleSearchSupport.refreshStatus();
+                                articleSearchSupport.refreshTable();
+                            }
                         }),
                         () -> !stopArticleLoading && !isCancelled()
                 );
 
-                Platform.runLater(() ->
-                        updateArticlesLoadedLabel(articleItems.size(), expectedArticleCount)
-                );
+                Platform.runLater(() -> {
+                    updateArticlesLoadedLabel(articleItems.size(), expectedArticleCount);
+
+                    if (articleSearchSupport != null) {
+                        articleSearchSupport.refreshStatus();
+                        articleSearchSupport.refreshTable();
+                    }
+                });
 
                 return null;
             }
@@ -475,7 +510,7 @@ public class VenueController {
         articleLoadingTask.setOnFailed(event -> {
             Throwable exception = articleLoadingTask.getException();
             showError(
-                    "Σφάλμα φόρτωσης άρθρων",
+                    "Article loading error",
                     exception == null ? null : exception.getMessage()
             );
         });
@@ -488,6 +523,27 @@ public class VenueController {
 
         if (articleLoadingTask != null && articleLoadingTask.isRunning()) {
             articleLoadingTask.cancel();
+        }
+    }
+
+    @FXML
+    private void findNextArticleMatch() {
+        if (articleSearchSupport != null) {
+            articleSearchSupport.findNext();
+        }
+    }
+
+    private void resetArticleSearchNavigation() {
+        if (articleSearchSupport != null) {
+            articleSearchSupport.resetNavigation();
+            articleSearchSupport.refreshStatus();
+            articleSearchSupport.refreshTable();
+        }
+    }
+
+    private void clearArticleSearchText() {
+        if (articleSearchSupport != null) {
+            articleSearchSupport.clearSearchText();
         }
     }
 
@@ -523,6 +579,7 @@ public class VenueController {
             loadArticlesCheckBox.setSelected(false);
         }
 
+        clearArticleSearchText();
         clearVenueResults();
         setSelectedVenue(null);
         clearResultArea();
@@ -544,8 +601,8 @@ public class VenueController {
 
         } catch (IOException | NullPointerException exception) {
             showError(
-                    "Σφάλμα πλοήγησης",
-                    "Δεν ήταν δυνατή η επιστροφή στην αρχική σελίδα. Έλεγξε το HOME_FXML_PATH."
+                    "Navigation error",
+                    "Could not return to the home page. Please check HOME_FXML_PATH."
             );
         }
     }
@@ -690,6 +747,7 @@ public class VenueController {
                     articleItems.clear();
                     expectedArticleCount = 0;
                     updateArticlesLoadedLabel(0, 0);
+                    resetArticleSearchNavigation();
                     setArticleReportVisible(false);
                 }
             });
@@ -740,6 +798,7 @@ public class VenueController {
             articlesTable.setFixedCellSize(34);
             articlesTable.setItems(articleItems);
 
+            TableSearchSupport.applyReadableSelectionStyle(articlesTable);
             TableCopySupport.enableCellCopy(articlesTable);
         }
 
@@ -753,14 +812,14 @@ public class VenueController {
             titleColumn.setCellValueFactory(cellData ->
                     new SimpleStringProperty(nullToDash(extractArticleTitle(cellData.getValue())))
             );
-            TableCopySupport.makeStringColumnTextSelectable(titleColumn);
+            TableSearchSupport.makePlainTextColumn(titleColumn);
         }
 
         if (authorsColumn != null) {
             authorsColumn.setCellValueFactory(cellData ->
                     new SimpleStringProperty(nullToDash(extractArticleAuthors(cellData.getValue())))
             );
-            TableCopySupport.makeStringColumnTextSelectable(authorsColumn);
+            TableSearchSupport.makePlainTextColumn(authorsColumn);
         }
 
         if (pagesColumn != null) {
@@ -776,6 +835,31 @@ public class VenueController {
             );
             TableCopySupport.makeStringColumnTextSelectable(urlColumn);
         }
+    }
+
+    private void setupArticleSearchSupport() {
+        articleSearchSupport = new TableSearchSupport<>(
+                articlesTable,
+                articleItems,
+                articleSearchModeComboBox,
+                articleSearchField,
+                articleSearchNextButton,
+                articleSearchStatusLabel
+        );
+
+        articleSearchSupport.addSearchMode(
+                SEARCH_MODE_TITLE,
+                titleColumn,
+                article -> nullToDash(extractArticleTitle(article))
+        );
+
+        articleSearchSupport.addSearchMode(
+                SEARCH_MODE_AUTHOR,
+                authorsColumn,
+                article -> nullToDash(extractArticleAuthors(article))
+        );
+
+        articleSearchSupport.initialize(SEARCH_MODE_TITLE);
     }
 
     private void renderVenueResults(List<Object> results) {
@@ -1112,6 +1196,8 @@ public class VenueController {
         clearLineCharts();
 
         articleItems.clear();
+        resetArticleSearchNavigation();
+
         expectedArticleCount = 0;
         updateArticlesLoadedLabel(0, 0);
 
@@ -1144,7 +1230,7 @@ public class VenueController {
         Integer endYear = getComboBoxYearValue(toYearComboBox);
 
         if (startYear != null && endYear != null && endYear < startYear) {
-            throw new IllegalArgumentException("Το To year πρέπει να είναι μεγαλύτερο ή ίσο από το From year.");
+            throw new IllegalArgumentException("The To year must be greater than or equal to the From year.");
         }
 
         return new YearRange(startYear, endYear);
@@ -1386,7 +1472,7 @@ public class VenueController {
         Alert alert = new Alert(Alert.AlertType.ERROR);
         alert.setTitle(title);
         alert.setHeaderText(title);
-        alert.setContentText(message == null || message.isBlank() ? "Άγνωστο σφάλμα." : message);
+        alert.setContentText(message == null || message.isBlank() ? "Unknown error." : message);
         alert.showAndWait();
     }
 

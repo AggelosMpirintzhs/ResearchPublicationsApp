@@ -21,9 +21,11 @@ import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
+import javafx.scene.control.TextField;
 import javafx.scene.layout.VBox;
 import service.YearService;
 import util.TableCopySupport;
+import util.TableSearchSupport;
 
 import java.io.IOException;
 import java.util.List;
@@ -35,6 +37,10 @@ public class YearController {
 
     private static final int INITIAL_PUBLICATION_BATCH_SIZE = 100;
     private static final int PUBLICATION_BATCH_SIZE = 1000;
+
+    private static final String SEARCH_MODE_TITLE = "Title";
+    private static final String SEARCH_MODE_VENUE = "Venue";
+    private static final String SEARCH_MODE_AUTHOR = "Author";
 
     private final YearService yearService = new YearService();
 
@@ -53,6 +59,12 @@ public class YearController {
     private Task<Void> publicationLoadingTask;
 
     private long expectedPublicationCount = 0;
+
+    /*
+     * The in-table search logic is now handled by TableSearchSupport.
+     * This keeps the controller smaller and avoids duplicate search/highlight code.
+     */
+    private TableSearchSupport<YearPublicationDto> publicationSearchSupport;
 
     @FXML
     private ComboBox<AvailableYearDto> yearComboBox;
@@ -115,6 +127,18 @@ public class YearController {
     private VBox publicationReportPanel;
 
     @FXML
+    private ComboBox<String> publicationSearchModeComboBox;
+
+    @FXML
+    private TextField publicationSearchField;
+
+    @FXML
+    private Button publicationSearchNextButton;
+
+    @FXML
+    private Label publicationSearchStatusLabel;
+
+    @FXML
     private TableView<YearPublicationDto> publicationsTable;
 
     @FXML
@@ -143,11 +167,8 @@ public class YearController {
         setupYearComboBox();
         setupPublicationTypeComboBox();
         setupPublicationTable();
+        setupPublicationSearchSupport();
         setupLoadPublicationsOption();
-
-        if (publicationsTable != null) {
-            publicationsTable.setItems(publicationItems);
-        }
 
         clearResultArea();
         loadAvailableYears();
@@ -177,14 +198,17 @@ public class YearController {
             updateSelectedYearLabel(null);
 
             if (years == null || years.isEmpty()) {
-                showInfo("Δεν βρέθηκαν χρονιές", "Δεν υπάρχουν διαθέσιμες χρονιές στη βάση.");
+                showInfo(
+                        "No years found",
+                        "No available years were found in the database."
+                );
             }
         });
 
         task.setOnFailed(event -> {
             setYearLoading(false);
             Throwable exception = task.getException();
-            showError("Σφάλμα φόρτωσης χρονιών", exception == null ? null : exception.getMessage());
+            showError("Year loading error", exception == null ? null : exception.getMessage());
         });
 
         startBackgroundTask(task, "available-years-task");
@@ -193,13 +217,14 @@ public class YearController {
     @FXML
     private void loadYearProfile() {
         stopCurrentPublicationLoading();
+        resetPublicationSearchNavigation();
 
         int currentLoadVersion = loadVersion.incrementAndGet();
 
         AvailableYearDto selectedYear = yearComboBox == null ? null : yearComboBox.getValue();
 
         if (selectedYear == null || selectedYear.year() == null) {
-            showError("Δεν επιλέχθηκε χρονιά", "Πρέπει πρώτα να επιλέξεις μία χρονιά.");
+            showError("No year selected", "You must select a year first.");
             return;
         }
 
@@ -223,6 +248,7 @@ public class YearController {
 
         if (shouldLoadPublications) {
             publicationItems.clear();
+            resetPublicationSearchNavigation();
             updateArticlesLoadedLabel(0, expectedPublicationCount);
             setPublicationLoadingText("Loading first publications...");
 
@@ -233,6 +259,7 @@ public class YearController {
             );
         } else {
             publicationItems.clear();
+            resetPublicationSearchNavigation();
             expectedPublicationCount = 0;
             updateArticlesLoadedLabel(0, 0);
             setPublicationLoadingText("Publication loading is disabled.");
@@ -268,8 +295,8 @@ public class YearController {
                 stopCurrentPublicationLoading();
                 clearResultArea();
                 showInfo(
-                        "Δεν βρέθηκαν δεδομένα",
-                        "Δεν υπάρχουν στατιστικά για τη συγκεκριμένη χρονιά."
+                        "No data found",
+                        "There are no statistics for the selected year."
                 );
                 return;
             }
@@ -285,6 +312,11 @@ public class YearController {
              */
             expectedPublicationCount = data.expectedPublicationCount();
             updateArticlesLoadedLabel(publicationItems.size(), expectedPublicationCount);
+
+            if (publicationSearchSupport != null) {
+                publicationSearchSupport.refreshStatus();
+                publicationSearchSupport.refreshTable();
+            }
         });
 
         task.setOnFailed(event -> {
@@ -294,7 +326,7 @@ public class YearController {
 
             setLoading(false);
             Throwable exception = task.getException();
-            showError("Σφάλμα φόρτωσης προφίλ χρονιάς", exception == null ? null : exception.getMessage());
+            showError("Year profile loading error", exception == null ? null : exception.getMessage());
         });
 
         startBackgroundTask(task, "year-profile-task");
@@ -306,6 +338,7 @@ public class YearController {
             int currentLoadVersion
     ) {
         publicationItems.clear();
+        resetPublicationSearchNavigation();
         stopPublicationLoading = false;
 
         publicationLoadingTask = new Task<>() {
@@ -327,6 +360,11 @@ public class YearController {
 
                             publicationItems.addAll(batch);
                             updateArticlesLoadedLabel(publicationItems.size(), expectedPublicationCount);
+
+                            if (publicationSearchSupport != null) {
+                                publicationSearchSupport.refreshStatus();
+                                publicationSearchSupport.refreshTable();
+                            }
 
                             if (publicationItems.size() <= INITIAL_PUBLICATION_BATCH_SIZE) {
                                 setPublicationLoadingText(
@@ -354,6 +392,12 @@ public class YearController {
                         );
                     } else {
                         updateArticlesLoadedLabel(publicationItems.size(), expectedPublicationCount);
+
+                        if (publicationSearchSupport != null) {
+                            publicationSearchSupport.refreshStatus();
+                            publicationSearchSupport.refreshTable();
+                        }
+
                         setPublicationLoadingText(
                                 "Finished loading publications: " + publicationItems.size()
                         );
@@ -372,7 +416,7 @@ public class YearController {
             Throwable exception = publicationLoadingTask.getException();
             setPublicationLoadingText("Error while loading publications.");
             showError(
-                    "Σφάλμα φόρτωσης δημοσιεύσεων",
+                    "Publication loading error",
                     exception == null ? null : exception.getMessage()
             );
         });
@@ -385,6 +429,27 @@ public class YearController {
 
         if (publicationLoadingTask != null && publicationLoadingTask.isRunning()) {
             publicationLoadingTask.cancel();
+        }
+    }
+
+    @FXML
+    private void findNextPublicationMatch() {
+        if (publicationSearchSupport != null) {
+            publicationSearchSupport.findNext();
+        }
+    }
+
+    private void resetPublicationSearchNavigation() {
+        if (publicationSearchSupport != null) {
+            publicationSearchSupport.resetNavigation();
+            publicationSearchSupport.refreshStatus();
+            publicationSearchSupport.refreshTable();
+        }
+    }
+
+    private void clearPublicationSearchText() {
+        if (publicationSearchSupport != null) {
+            publicationSearchSupport.clearSearchText();
         }
     }
 
@@ -405,6 +470,7 @@ public class YearController {
             loadPublicationsCheckBox.setSelected(false);
         }
 
+        clearPublicationSearchText();
         updateSelectedYearLabel(null);
         clearResultArea();
         setPublicationLoadingText("Publications cleared.");
@@ -426,8 +492,8 @@ public class YearController {
 
         } catch (IOException | NullPointerException exception) {
             showError(
-                    "Σφάλμα πλοήγησης",
-                    "Δεν ήταν δυνατή η επιστροφή στην αρχική σελίδα. Έλεγξε το HOME_FXML_PATH."
+                    "Navigation error",
+                    "Could not return to the home page. Please check HOME_FXML_PATH."
             );
         }
     }
@@ -494,6 +560,7 @@ public class YearController {
                     publicationItems.clear();
                     expectedPublicationCount = 0;
                     updateArticlesLoadedLabel(0, 0);
+                    resetPublicationSearchNavigation();
                     setPublicationLoadingText("Publication loading is disabled.");
                 }
             });
@@ -513,6 +580,7 @@ public class YearController {
         if (publicationsTable != null) {
             publicationsTable.setItems(publicationItems);
 
+            TableSearchSupport.applyReadableSelectionStyle(publicationsTable);
             TableCopySupport.enableCellCopy(publicationsTable);
         }
 
@@ -533,21 +601,21 @@ public class YearController {
             publicationTitleColumn.setCellValueFactory(cellData ->
                     new SimpleStringProperty(nullToDash(cellData.getValue().title()))
             );
-            TableCopySupport.makeStringColumnTextSelectable(publicationTitleColumn);
+            TableSearchSupport.makePlainTextColumn(publicationTitleColumn);
         }
 
         if (publicationVenueColumn != null) {
             publicationVenueColumn.setCellValueFactory(cellData ->
                     new SimpleStringProperty(buildVenueDisplayName(cellData.getValue()))
             );
-            TableCopySupport.makeStringColumnTextSelectable(publicationVenueColumn);
+            TableSearchSupport.makePlainTextColumn(publicationVenueColumn);
         }
 
         if (publicationAuthorsColumn != null) {
             publicationAuthorsColumn.setCellValueFactory(cellData ->
                     new SimpleStringProperty(nullToDash(cellData.getValue().authors()))
             );
-            TableCopySupport.makeStringColumnTextSelectable(publicationAuthorsColumn);
+            TableSearchSupport.makePlainTextColumn(publicationAuthorsColumn);
         }
 
         if (publicationPagesColumn != null) {
@@ -566,6 +634,37 @@ public class YearController {
             );
             TableCopySupport.makeStringColumnTextSelectable(publicationUrlColumn);
         }
+    }
+
+    private void setupPublicationSearchSupport() {
+        publicationSearchSupport = new TableSearchSupport<>(
+                publicationsTable,
+                publicationItems,
+                publicationSearchModeComboBox,
+                publicationSearchField,
+                publicationSearchNextButton,
+                publicationSearchStatusLabel
+        );
+
+        publicationSearchSupport.addSearchMode(
+                SEARCH_MODE_TITLE,
+                publicationTitleColumn,
+                publication -> nullToDash(publication.title())
+        );
+
+        publicationSearchSupport.addSearchMode(
+                SEARCH_MODE_VENUE,
+                publicationVenueColumn,
+                this::buildVenueDisplayName
+        );
+
+        publicationSearchSupport.addSearchMode(
+                SEARCH_MODE_AUTHOR,
+                publicationAuthorsColumn,
+                publication -> nullToDash(publication.authors())
+        );
+
+        publicationSearchSupport.initialize(SEARCH_MODE_TITLE);
     }
 
     private void updateFastYearPreview(AvailableYearDto yearDto) {
@@ -621,6 +720,7 @@ public class YearController {
         setLabelText(avgAuthorsPerArticleLabel, "-");
 
         publicationItems.clear();
+        resetPublicationSearchNavigation();
 
         expectedPublicationCount = 0;
         updateArticlesLoadedLabel(0, 0);
@@ -766,6 +866,12 @@ public class YearController {
         if (refreshYearsButton != null) {
             refreshYearsButton.setDisable(loading);
         }
+
+        /*
+         * Den kanoume disable to in-table search.
+         * Etsi o xristis mporei na psaxnei mesa sta rows pou exoun idi fortothei,
+         * akoma kai an ta epomena batches sinexizoun na erxontai.
+         */
     }
 
     private void startBackgroundTask(Task<?> task, String threadName) {
@@ -778,7 +884,7 @@ public class YearController {
         Alert alert = new Alert(Alert.AlertType.ERROR);
         alert.setTitle(title);
         alert.setHeaderText(title);
-        alert.setContentText(message == null || message.isBlank() ? "Άγνωστο σφάλμα." : message);
+        alert.setContentText(message == null || message.isBlank() ? "Unknown error." : message);
         alert.showAndWait();
     }
 

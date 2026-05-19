@@ -8,6 +8,7 @@
 <?import javafx.scene.control.ScrollPane?>
 <?import javafx.scene.control.TableColumn?>
 <?import javafx.scene.control.TableView?>
+<?import javafx.scene.control.TextField?>
 <?import javafx.scene.layout.BorderPane?>
 <?import javafx.scene.layout.GridPane?>
 <?import javafx.scene.layout.HBox?>
@@ -239,17 +240,56 @@
                                     <Label text="Publication Report"
                                            styleClass="content-title"/>
 
-                                    <Label text="Publications are loaded only when the Load publications option is selected. Results are shown in a fixed-height scrollable table."
+                                    <Label text="Publications are loaded only when the Load publications option is selected."
                                            styleClass="stat-muted"
                                            wrapText="true"/>
                                 </VBox>
+
+                                <!-- Small in-table search.
+                                     It does not query the database; it only navigates inside
+                                     the publications that are already loaded in the TableView. -->
+                                <HBox spacing="8"
+                                      alignment="CENTER_LEFT"
+                                      maxWidth="-Infinity"
+                                      style="-fx-background-color: rgba(255,255,255,0.92);
+                 -fx-border-color: #b9daf7;
+                 -fx-border-radius: 999px;
+                 -fx-background-radius: 999px;
+                 -fx-padding: 5 8 5 8;">
+
+                                    <Label text="⌕"
+                                           styleClass="google-search-icon"/>
+
+                                    <ComboBox fx:id="publicationSearchModeComboBox"
+                                              prefWidth="95"
+                                              minHeight="30"
+                                              styleClass="google-search-combo"/>
+
+                                    <TextField fx:id="publicationSearchField"
+                                               promptText="Find in table"
+                                               prefWidth="230"
+                                               minHeight="30"
+                                               styleClass="google-search-input"/>
+
+                                    <Label fx:id="publicationSearchStatusLabel"
+                                           text="/"
+                                           minWidth="58"
+                                           style="-fx-text-fill: #0f4c81;
+                      -fx-font-size: 11px;
+                      -fx-font-weight: 800;
+                      -fx-alignment: center;"/>
+
+                                    <Button fx:id="publicationSearchNextButton"
+                                            text="Next"
+                                            onAction="#findNextPublicationMatch"
+                                            minHeight="30"
+                                            styleClass="google-secondary-button"/>
+                                </HBox>
 
                                 <Label fx:id="articlesLoadedLabel"
                                        text="Articles Loaded: 0 / 0"
                                        style="-fx-text-fill: #0f4c81; -fx-font-weight: 700; -fx-font-size: 13px;"/>
 
-                                <Label text="SCROLL TABLE"
-                                       styleClass="small-blue-chip"/>
                             </HBox>
 
                             <TableView fx:id="publicationsTable"

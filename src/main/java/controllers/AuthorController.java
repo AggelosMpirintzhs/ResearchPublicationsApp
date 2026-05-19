@@ -33,6 +33,7 @@ import javafx.scene.layout.VBox;
 import javafx.util.Duration;
 import service.AuthorService;
 import util.TableCopySupport;
+import util.TableSearchSupport;
 
 import java.io.IOException;
 import java.time.LocalDate;
@@ -48,6 +49,9 @@ public class AuthorController {
     private static final int MIN_SEARCH_LENGTH = 3;
     private static final int SEARCH_DEBOUNCE_MS = 250;
     private static final int PUBLICATION_BATCH_SIZE = 1000;
+
+    private static final String SEARCH_MODE_TITLE = "Title";
+    private static final String SEARCH_MODE_VENUE = "Venue";
 
     private final AuthorService authorService = new AuthorService();
 
@@ -68,6 +72,13 @@ public class AuthorController {
     private volatile boolean stopPublicationLoading = false;
 
     private long expectedPublicationCount = 0;
+
+    /*
+     * Όλη η λογική για in-table search, counter, Enter/Next,
+     * scroll, selected-cell highlight και matched-text highlight
+     * βρίσκεται πλέον στο util.TableSearchSupport.
+     */
+    private TableSearchSupport<AuthorPublicationDto> publicationSearchSupport;
 
     @FXML
     private TextField authorSearchField;
@@ -151,6 +162,18 @@ public class AuthorController {
     private Label publicationsLoadedLabel;
 
     @FXML
+    private ComboBox<String> publicationSearchModeComboBox;
+
+    @FXML
+    private TextField publicationSearchField;
+
+    @FXML
+    private Button publicationSearchNextButton;
+
+    @FXML
+    private Label publicationSearchStatusLabel;
+
+    @FXML
     private TableView<AuthorPublicationDto> publicationsTable;
 
     @FXML
@@ -182,6 +205,7 @@ public class AuthorController {
         setupLoadPublicationsOption();
         setupCharts();
         setupPublicationsTable();
+        setupPublicationSearchSupport();
 
         clearAuthorResults();
         setSelectedAuthor(null);
@@ -243,7 +267,7 @@ public class AuthorController {
 
         authorSearchTask.setOnFailed(event -> {
             Throwable exception = authorSearchTask.getException();
-            showError("Σφάλμα αναζήτησης συγγραφέων", exception == null ? null : exception.getMessage());
+            showError("Failed author search", exception == null ? null : exception.getMessage());
         });
 
         startBackgroundTask(authorSearchTask, "author-realtime-search-task");
@@ -343,6 +367,7 @@ public class AuthorController {
                     publicationItems.clear();
                     expectedPublicationCount = 0;
                     updatePublicationsLoadedLabel(0, 0);
+                    resetPublicationSearchNavigation();
                     setPublicationReportVisible(false);
                 }
             });
@@ -386,6 +411,8 @@ public class AuthorController {
             publicationsTable.setMaxHeight(350);
             publicationsTable.setFixedCellSize(34);
 
+            TableSearchSupport.applyReadableSelectionStyle(publicationsTable);
+
             TableCopySupport.enableCellCopy(publicationsTable);
         }
 
@@ -406,21 +433,24 @@ public class AuthorController {
             publicationTitleColumn.setCellValueFactory(cellData ->
                     new SimpleStringProperty(nullToDash(cellData.getValue().title()))
             );
-            TableCopySupport.makeStringColumnTextSelectable(publicationTitleColumn);
+
+            TableSearchSupport.makePlainTextColumn(publicationTitleColumn);
         }
 
         if (publicationVenueColumn != null) {
             publicationVenueColumn.setCellValueFactory(cellData ->
                     new SimpleStringProperty(buildVenueDisplayName(cellData.getValue()))
             );
-            TableCopySupport.makeStringColumnTextSelectable(publicationVenueColumn);
+
+            TableSearchSupport.makePlainTextColumn(publicationVenueColumn);
         }
 
         if (publicationAuthorsColumn != null) {
             publicationAuthorsColumn.setCellValueFactory(cellData ->
                     new SimpleStringProperty(nullToDash(cellData.getValue().authors()))
             );
-            TableCopySupport.makeStringColumnTextSelectable(publicationAuthorsColumn);
+
+            TableSearchSupport.makePlainTextColumn(publicationAuthorsColumn);
         }
 
         if (publicationPagesColumn != null) {
@@ -441,14 +471,61 @@ public class AuthorController {
         }
     }
 
+    private void setupPublicationSearchSupport() {
+        publicationSearchSupport = new TableSearchSupport<>(
+                publicationsTable,
+                publicationItems,
+                publicationSearchModeComboBox,
+                publicationSearchField,
+                publicationSearchNextButton,
+                publicationSearchStatusLabel
+        );
+
+        publicationSearchSupport.addSearchMode(
+                SEARCH_MODE_TITLE,
+                publicationTitleColumn,
+                publication -> nullToDash(publication.title())
+        );
+
+        publicationSearchSupport.addSearchMode(
+                SEARCH_MODE_VENUE,
+                publicationVenueColumn,
+                this::buildVenueDisplayName
+        );
+
+        publicationSearchSupport.initialize(SEARCH_MODE_TITLE);
+    }
+
+    @FXML
+    private void findNextPublicationMatch() {
+        if (publicationSearchSupport != null) {
+            publicationSearchSupport.findNext();
+        }
+    }
+
+    private void resetPublicationSearchNavigation() {
+        if (publicationSearchSupport != null) {
+            publicationSearchSupport.resetNavigation();
+            publicationSearchSupport.refreshStatus();
+            publicationSearchSupport.refreshTable();
+        }
+    }
+
+    private void clearPublicationSearchText() {
+        if (publicationSearchSupport != null) {
+            publicationSearchSupport.clearSearchText();
+        }
+    }
+
     @FXML
     private void loadAuthorProfile() {
         stopCurrentPublicationLoading();
+        resetPublicationSearchNavigation();
 
         if (selectedAuthor == null || selectedAuthor.authorId() == null) {
             showError(
-                    "Δεν επιλέχθηκε συγγραφέας",
-                    "Πρέπει πρώτα να αναζητήσεις και να επιλέξεις έναν συγγραφέα."
+                    "No author selected",
+                    "You first need to search and select an author."
             );
             return;
         }
@@ -458,7 +535,7 @@ public class AuthorController {
         try {
             yearRange = getSelectedYearRange();
         } catch (IllegalArgumentException exception) {
-            showError("Λάθος χρονιές", exception.getMessage());
+            showError("Wrong year selection", exception.getMessage());
             return;
         }
 
@@ -488,8 +565,8 @@ public class AuthorController {
             if (!data.hasProfile()) {
                 clearResultArea();
                 showInfo(
-                        "Δεν βρέθηκαν δεδομένα",
-                        "Δεν υπάρχουν δεδομένα για τον επιλεγμένο συγγραφέα στο συγκεκριμένο εύρος χρονιών."
+                        "No data found",
+                        "There are no data for this author in the selected time period."
                 );
                 return;
             }
@@ -502,6 +579,7 @@ public class AuthorController {
 
             if (shouldLoadPublications) {
                 publicationItems.clear();
+                resetPublicationSearchNavigation();
                 setPublicationReportVisible(true);
                 updatePublicationsLoadedLabel(0, expectedPublicationCount);
 
@@ -512,6 +590,7 @@ public class AuthorController {
                 );
             } else {
                 publicationItems.clear();
+                resetPublicationSearchNavigation();
                 expectedPublicationCount = 0;
                 updatePublicationsLoadedLabel(0, 0);
                 setPublicationReportVisible(false);
@@ -521,7 +600,7 @@ public class AuthorController {
         task.setOnFailed(event -> {
             setLoading(false);
             Throwable exception = task.getException();
-            showError("Σφάλμα φόρτωσης προφίλ συγγραφέα", exception == null ? null : exception.getMessage());
+            showError("Error loading author profile", exception == null ? null : exception.getMessage());
         });
 
         startBackgroundTask(task, "author-profile-task");
@@ -535,6 +614,7 @@ public class AuthorController {
         stopCurrentPublicationLoading();
 
         publicationItems.clear();
+        resetPublicationSearchNavigation();
         stopPublicationLoading = false;
 
         updatePublicationsLoadedLabel(0, expectedPublicationCount);
@@ -550,20 +630,35 @@ public class AuthorController {
                         PUBLICATION_BATCH_SIZE,
                         batch -> Platform.runLater(() -> {
                             publicationItems.addAll(batch);
+
                             updatePublicationsLoadedLabel(
                                     publicationItems.size(),
                                     expectedPublicationCount
                             );
+
+                            /*
+                             * Αν ο χρήστης έχει ήδη γράψει search text,
+                             * ο counter ενημερώνεται όσο έρχονται νέα batches.
+                             */
+                            if (publicationSearchSupport != null) {
+                                publicationSearchSupport.refreshStatus();
+                                publicationSearchSupport.refreshTable();
+                            }
                         }),
                         () -> !stopPublicationLoading && !isCancelled()
                 );
 
-                Platform.runLater(() ->
-                        updatePublicationsLoadedLabel(
-                                publicationItems.size(),
-                                expectedPublicationCount
-                        )
-                );
+                Platform.runLater(() -> {
+                    updatePublicationsLoadedLabel(
+                            publicationItems.size(),
+                            expectedPublicationCount
+                    );
+
+                    if (publicationSearchSupport != null) {
+                        publicationSearchSupport.refreshStatus();
+                        publicationSearchSupport.refreshTable();
+                    }
+                });
 
                 return null;
             }
@@ -572,7 +667,7 @@ public class AuthorController {
         publicationLoadingTask.setOnFailed(event -> {
             Throwable exception = publicationLoadingTask.getException();
             showError(
-                    "Σφάλμα φόρτωσης δημοσιεύσεων",
+                    "Failed publications loading",
                     exception == null ? null : exception.getMessage()
             );
         });
@@ -615,6 +710,7 @@ public class AuthorController {
 
         clearAuthorResults();
         setSelectedAuthor(null);
+        clearPublicationSearchText();
         clearResultArea();
     }
 
@@ -632,8 +728,8 @@ public class AuthorController {
 
         } catch (IOException | NullPointerException exception) {
             showError(
-                    "Σφάλμα πλοήγησης",
-                    "Δεν ήταν δυνατή η επιστροφή στην αρχική σελίδα. Έλεγξε το HOME_FXML_PATH."
+                    "Failed to navigate",
+                    "Failed to return to the home page.Check the HOME_FXML_PATH."
             );
         }
     }
@@ -879,6 +975,8 @@ public class AuthorController {
         clearCharts();
 
         publicationItems.clear();
+        resetPublicationSearchNavigation();
+
         expectedPublicationCount = 0;
         updatePublicationsLoadedLabel(0, 0);
 
@@ -929,7 +1027,7 @@ public class AuthorController {
         Integer endYear = getComboBoxYearValue(toYearComboBox);
 
         if (startYear != null && endYear != null && endYear < startYear) {
-            throw new IllegalArgumentException("Το To year πρέπει να είναι μεγαλύτερο ή ίσο από το From year.");
+            throw new IllegalArgumentException("The start year must be greater than the end year");
         }
 
         return new YearRange(startYear, endYear);
@@ -1069,7 +1167,7 @@ public class AuthorController {
         Alert alert = new Alert(Alert.AlertType.ERROR);
         alert.setTitle(title);
         alert.setHeaderText(title);
-        alert.setContentText(message == null || message.isBlank() ? "Άγνωστο σφάλμα." : message);
+        alert.setContentText(message == null || message.isBlank() ? "Unknown error." : message);
         alert.showAndWait();
     }
 

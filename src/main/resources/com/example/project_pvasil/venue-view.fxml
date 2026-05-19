@@ -479,13 +479,50 @@
                                            wrapText="true"/>
                                 </VBox>
 
+                                <HBox spacing="8"
+                                      alignment="CENTER_LEFT"
+                                      maxWidth="-Infinity"
+                                      style="-fx-background-color: rgba(255,255,255,0.92);
+                 -fx-border-color: #b9daf7;
+                 -fx-border-radius: 999px;
+                 -fx-background-radius: 999px;
+                 -fx-padding: 5 8 5 8;">
+
+                                    <Label text="⌕"
+                                           styleClass="google-search-icon"/>
+
+                                    <ComboBox fx:id="articleSearchModeComboBox"
+                                              prefWidth="95"
+                                              minHeight="30"
+                                              styleClass="google-search-combo"/>
+
+                                    <TextField fx:id="articleSearchField"
+                                               promptText="Find in table"
+                                               prefWidth="230"
+                                               minHeight="30"
+                                               styleClass="google-search-input"/>
+
+                                    <Label fx:id="articleSearchStatusLabel"
+                                           text="/"
+                                           minWidth="58"
+                                           style="-fx-text-fill: #0f4c81;
+                      -fx-font-size: 11px;
+                      -fx-font-weight: 800;
+                      -fx-alignment: center;"/>
+
+                                    <Button fx:id="articleSearchNextButton"
+                                            text="Next"
+                                            onAction="#findNextArticleMatch"
+                                            minHeight="30"
+                                            styleClass="google-secondary-button"/>
+                                </HBox>
+
                                 <Label fx:id="articlesLoadedLabel"
                                        text="Articles Loaded: 0 / 0"
                                        style="-fx-text-fill: #0f4c81; -fx-font-weight: 700; -fx-font-size: 13px;"/>
 
-                                <Label text="SCROLL TABLE"
-                                       styleClass="small-blue-chip"/>
                             </HBox>
+
 
                             <TableView fx:id="articlesTable"
                                        prefHeight="430"
@@ -535,3 +572,4 @@
     </center>
 
 </BorderPane>
+
