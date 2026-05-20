@@ -32,7 +32,7 @@ import java.util.function.Function;
 
 public class TableSearchSupport<S> {
 
-    private static final String EMPTY_STATUS = "-";
+    private static final String EMPTY_STATUS = "";
     private static final String ZERO_STATUS = "0/0";
 
     private final TableView<S> tableView;

@@ -42,7 +42,7 @@ import java.util.List;
 
 public class AuthorController {
 
-    private static final String HOME_FXML_PATH = "/com/example/project_pvasil/hello-view.fxml";
+    private static final String HOME_FXML_PATH = "/app/hello-view.fxml";
 
     private static final int MIN_YEAR = 1900;
     private static final int SEARCH_LIMIT = 20;

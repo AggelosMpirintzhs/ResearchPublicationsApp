@@ -19,6 +19,7 @@
     <!-- Dependency versions -->
     <javafx.version>21.0.5</javafx.version>
     <junit.version>5.10.2</junit.version>
+    <mockito.version>5.12.0</mockito.version>
   </properties>
 
   <dependencies>
@@ -90,11 +91,19 @@
       <version>10.17.3</version>
     </dependency>
 
-    <!-- JUnit Tests -->
+    <!-- JUnit 5 Tests -->
     <dependency>
       <groupId>org.junit.jupiter</groupId>
       <artifactId>junit-jupiter</artifactId>
       <version>${junit.version}</version>
+      <scope>test</scope>
+    </dependency>
+
+    <!-- Mockito support for JUnit 5 -->
+    <dependency>
+      <groupId>org.mockito</groupId>
+      <artifactId>mockito-junit-jupiter</artifactId>
+      <version>${mockito.version}</version>
       <scope>test</scope>
     </dependency>
 
@@ -119,7 +128,7 @@
         <artifactId>javafx-maven-plugin</artifactId>
         <version>0.0.8</version>
         <configuration>
-          <mainClass>com.example.project_pvasil.HelloApplication</mainClass>
+          <mainClass>app.HelloApplication</mainClass>
           <launcher>app</launcher>
           <jlinkZipName>app</jlinkZipName>
           <jlinkImageName>app</jlinkImageName>

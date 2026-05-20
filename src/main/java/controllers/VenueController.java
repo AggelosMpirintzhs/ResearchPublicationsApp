@@ -45,15 +45,15 @@ import java.util.List;
 
 public class VenueController {
 
-    private static final String HOME_FXML_PATH = "/com/example/project_pvasil/hello-view.fxml";
+    private static final String HOME_FXML_PATH = "/app/hello-view.fxml";
 
     private static final int MIN_YEAR = 1900;
-    private static final int SEARCH_LIMIT = 20;
+    private static final Integer SEARCH_LIMIT = Integer.valueOf(20);
 
     private static final int MIN_VENUE_SEARCH_LENGTH = 3;
     private static final int VENUE_SEARCH_DEBOUNCE_MS = 250;
 
-    private static final int ARTICLE_BATCH_SIZE = 1000;
+    private static final Integer ARTICLE_BATCH_SIZE = Integer.valueOf(1000);
 
     private static final String SEARCH_MODE_TITLE = "Title";
     private static final String SEARCH_MODE_AUTHOR = "Author";
@@ -480,7 +480,7 @@ public class VenueController {
                         venueId,
                         startYear,
                         endYear,
-                        0,
+                        Integer.valueOf(0),
                         ARTICLE_BATCH_SIZE,
                         batch -> Platform.runLater(() -> {
                             articleItems.addAll(batch);

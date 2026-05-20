@@ -171,7 +171,7 @@ public class VenueService {
                                 venueId,
                                 startYear,
                                 endYear,
-                                safeLastArticleId,
+                                Integer.valueOf(safeLastArticleId),
                                 batchSize
                         )
                 );
@@ -181,7 +181,7 @@ public class VenueService {
                                 venueId,
                                 startYear,
                                 endYear,
-                                safeLastArticleId,
+                                Integer.valueOf(safeLastArticleId),
                                 batchSize
                         )
                 );

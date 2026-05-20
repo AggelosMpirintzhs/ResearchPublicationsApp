@@ -1,0 +1,167 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.chart.LineChart?>
+<?import javafx.scene.chart.NumberAxis?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.ComboBox?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ScrollPane?>
+<?import javafx.scene.layout.FlowPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.StackPane?>
+<?import javafx.scene.layout.VBox?>
+
+<ScrollPane xmlns="http://javafx.com/javafx"
+            xmlns:fx="http://javafx.com/fxml"
+            fx:controller="controllers.charts.VenueCategoriesController"
+            fitToWidth="true"
+            hbarPolicy="NEVER"
+            pannable="true"
+            styleClass="page-scroll">
+
+    <content>
+        <StackPane alignment="TOP_CENTER">
+            <padding>
+                <Insets top="24" right="24" bottom="42" left="24"/>
+            </padding>
+
+            <VBox spacing="22"
+                  alignment="TOP_CENTER"
+                  maxWidth="1500">
+
+                <VBox spacing="10"
+                      styleClass="venue-hero-card"
+                      maxWidth="1500">
+
+                    <Label text="Venue Categories"
+                           styleClass="venue-hero-title"/>
+
+                    <Label text="Analyze yearly trends for conference PrimaryFoR categories or journal BestSubjectArea categories."
+                           wrapText="true"
+                           styleClass="venue-hero-subtitle"/>
+                </VBox>
+
+                <VBox spacing="16"
+                      styleClass="filter-card"
+                      maxWidth="1500">
+
+                    <VBox spacing="5">
+                        <Label text="Category yearly trends"
+                               styleClass="content-title"/>
+
+                        <Label text="Choose category type, select a category from the database and optionally restrict the year range."
+                               wrapText="true"
+                               styleClass="stat-muted"/>
+                    </VBox>
+
+                    <HBox spacing="12"
+                          alignment="CENTER_LEFT"
+                          styleClass="google-search-filters-row">
+
+                        <ComboBox fx:id="categoryTypeComboBox"
+                                  promptText="Category type"
+                                  prefWidth="260"
+                                  styleClass="form-control"/>
+
+                        <ComboBox fx:id="categoryFilterComboBox"
+                                  promptText="Select category"
+                                  prefWidth="420"
+                                  styleClass="form-control"/>
+
+                        <ComboBox fx:id="categoryFromYearComboBox"
+                                  promptText="From year"
+                                  prefWidth="155"
+                                  styleClass="form-control"/>
+
+                        <ComboBox fx:id="categoryToYearComboBox"
+                                  promptText="To year"
+                                  prefWidth="155"
+                                  styleClass="form-control"/>
+
+                        <Button fx:id="loadCategoryTrendButton"
+                                text="Load Trends"
+                                onAction="#loadCategoryTrends"
+                                styleClass="primary-button"/>
+
+                        <Button fx:id="clearCategoryTrendButton"
+                                text="Clear"
+                                onAction="#clearCategoryTrends"
+                                styleClass="secondary-button"/>
+                    </HBox>
+
+                    <Label fx:id="categoryStatusLabel"
+                           text="Choose category type and load yearly trends."
+                           styleClass="hint-label"/>
+                </VBox>
+
+                <VBox spacing="16"
+                      styleClass="dashboard-panel charts-dashboard"
+                      maxWidth="1500">
+
+                    <HBox alignment="CENTER_LEFT">
+                        <VBox spacing="4" HBox.hgrow="ALWAYS">
+                            <Label text="Category Trend Line Chart"
+                                   styleClass="content-title"/>
+
+                            <Label text="Each line represents a category. The chart shows how many venues belong to that category per year."
+                                   wrapText="true"
+                                   styleClass="stat-muted"/>
+                        </VBox>
+
+                        <Label text="CATEGORY LINE CHART"
+                               styleClass="small-blue-chip"/>
+                    </HBox>
+
+                    <VBox spacing="8"
+                          styleClass="chart-card"
+                          maxWidth="1500">
+
+                        <LineChart fx:id="categoryTrendLineChart"
+                                   prefHeight="500"
+                                   minHeight="460"
+                                   animated="false"
+                                   createSymbols="true"
+                                   legendVisible="false"
+                                   horizontalGridLinesVisible="true"
+                                   verticalGridLinesVisible="true"
+                                   alternativeRowFillVisible="false"
+                                   alternativeColumnFillVisible="false"
+                                   styleClass="beautiful-line-chart">
+
+                            <xAxis>
+                                <NumberAxis fx:id="categoryYearAxis"
+                                            label="Year"
+                                            forceZeroInRange="false"
+                                            minorTickVisible="false"/>
+                            </xAxis>
+
+                            <yAxis>
+                                <NumberAxis fx:id="categoryCountAxis"
+                                            label="Venues count"
+                                            forceZeroInRange="true"
+                                            minorTickVisible="false"/>
+                            </yAxis>
+                        </LineChart>
+                    </VBox>
+
+                    <VBox fx:id="categoryLegendBox"
+                          spacing="8"
+                          styleClass="chart-card"
+                          visible="false"
+                          managed="false"
+                          maxWidth="1500">
+
+                        <Label text="Legend"
+                               styleClass="chart-card-title"/>
+
+                        <FlowPane fx:id="categoryLegendFlow"
+                                  hgap="10"
+                                  vgap="8"
+                                  prefWrapLength="1200"/>
+                    </VBox>
+                </VBox>
+            </VBox>
+        </StackPane>
+    </content>
+</ScrollPane>

@@ -6,7 +6,7 @@ import dto.conference.ConferenceRankingDto;
 import dto.conference.ConferenceSearchResultDto;
 import dto.conference.ConferenceYearlyStatsDto;
 import repository.ConferenceRepository;
-
+import dto.chart.CategoryOptionDto;
 import java.util.List;
 import java.util.Optional;
 
@@ -30,6 +30,9 @@ public class ConferenceService {
 
     public ConferenceService(ConferenceRepository conferenceRepository) {
         this.conferenceRepository = conferenceRepository;
+    }
+    public List<CategoryOptionDto> getPrimaryFoRCategories() {
+        return conferenceRepository.findPrimaryFoRCategories();
     }
 
     public List<ConferenceSearchResultDto> searchConferences(String searchText, Integer limit) {

@@ -35,12 +35,12 @@ public class DataSourceFactory {
 
         } catch (ClassNotFoundException exception) {
             throw new DatabaseConnectionException(
-                    "Δεν βρέθηκε ο JDBC driver: " + databaseConfig.driver(),
+                    "JDBC driver: not found" + databaseConfig.driver(),
                     exception
             );
         } catch (Exception exception) {
             throw new DatabaseConnectionException(
-                    "Αποτυχία δημιουργίας DataSource.",
+                    "Falied to create DataSource.",
                     exception
             );
         }

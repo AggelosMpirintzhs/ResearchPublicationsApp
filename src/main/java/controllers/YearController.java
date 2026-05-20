@@ -33,7 +33,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 public class YearController {
 
-    private static final String HOME_FXML_PATH = "/com/example/project_pvasil/hello-view.fxml";
+    private static final String HOME_FXML_PATH = "/app/hello-view.fxml";
 
     private static final int INITIAL_PUBLICATION_BATCH_SIZE = 100;
     private static final int PUBLICATION_BATCH_SIZE = 1000;

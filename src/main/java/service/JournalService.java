@@ -6,7 +6,7 @@ import dto.journal.JournalRankingDto;
 import dto.journal.JournalSearchResultDto;
 import dto.journal.JournalYearlyStatsDto;
 import repository.JournalRepository;
-
+import dto.chart.CategoryOptionDto;
 import java.util.List;
 import java.util.Optional;
 
@@ -30,6 +30,10 @@ public class JournalService {
 
     public JournalService(JournalRepository journalRepository) {
         this.journalRepository = journalRepository;
+    }
+
+    public List<CategoryOptionDto> getBestSubjectAreas() {
+        return journalRepository.findBestSubjectAreas();
     }
 
     public List<JournalSearchResultDto> searchJournals(String searchText, Integer limit) {

@@ -1,0 +1,365 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.chart.BarChart?>
+<?import javafx.scene.chart.CategoryAxis?>
+<?import javafx.scene.chart.LineChart?>
+<?import javafx.scene.chart.NumberAxis?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.ComboBox?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ListView?>
+<?import javafx.scene.control.ScrollPane?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.layout.FlowPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.Region?>
+<?import javafx.scene.layout.StackPane?>
+<?import javafx.scene.layout.VBox?>
+
+<ScrollPane xmlns="http://javafx.com/javafx"
+            xmlns:fx="http://javafx.com/fxml"
+            fx:controller="controllers.charts.VenueAnalysisController"
+            fitToWidth="true"
+            hbarPolicy="NEVER"
+            pannable="true"
+            styleClass="page-scroll">
+
+    <content>
+        <StackPane alignment="TOP_CENTER">
+            <padding>
+                <Insets top="24" right="24" bottom="42" left="24"/>
+            </padding>
+
+            <VBox spacing="22"
+                  alignment="TOP_CENTER"
+                  maxWidth="1500">
+
+                <VBox spacing="10"
+                      styleClass="venue-hero-card"
+                      maxWidth="1500">
+
+                    <Label text="Venue Analysis"
+                           styleClass="venue-hero-title"/>
+
+                    <Label text="Compare selected journals and conferences through yearly line charts and aggregate bar charts."
+                           wrapText="true"
+                           styleClass="venue-hero-subtitle"/>
+                </VBox>
+
+                <VBox spacing="16"
+                      styleClass="filter-card"
+                      maxWidth="1500">
+
+                    <VBox spacing="5">
+                        <Label text="Select journals or conferences"
+                               styleClass="content-title"/>
+
+                        <Label text="Search a venue, add it to the selected list, choose a metric and optionally filter by year range."
+                               wrapText="true"
+                               styleClass="stat-muted"/>
+                    </VBox>
+
+                    <VBox spacing="0"
+                          styleClass="google-search-shell">
+
+                        <HBox spacing="10"
+                              alignment="CENTER_LEFT"
+                              styleClass="google-search-main-row">
+
+                            <Label text="⌕"
+                                   styleClass="google-search-icon"/>
+
+                            <TextField fx:id="venueSearchField"
+                                       promptText="Search journal or conference"
+                                       HBox.hgrow="ALWAYS"
+                                       styleClass="google-search-input"/>
+
+                            <ComboBox fx:id="venueTypeComboBox"
+                                      promptText="Type"
+                                      prefWidth="180"
+                                      styleClass="google-search-combo"/>
+
+                            <Button text="Search"
+                                    onAction="#searchVenues"
+                                    styleClass="google-secondary-button"/>
+
+                            <Button fx:id="addSelectedButton"
+                                    text="Add"
+                                    onAction="#addSelectedVenue"
+                                    styleClass="google-search-button"/>
+
+                            <Button fx:id="clearButton"
+                                    text="Clear"
+                                    onAction="#clear"
+                                    styleClass="google-secondary-button"/>
+                        </HBox>
+
+                        <VBox fx:id="searchResultsContainer"
+                              spacing="6"
+                              visible="false"
+                              managed="false"
+                              styleClass="google-suggestions-panel">
+
+                            <Label text="Suggested results"
+                                   styleClass="google-suggestions-header"/>
+
+                            <ListView fx:id="searchResultsListView"
+                                      prefHeight="150"
+                                      minHeight="150"
+                                      maxHeight="150"
+                                      styleClass="google-suggestions-list"/>
+                        </VBox>
+                    </VBox>
+
+                    <VBox spacing="8">
+                        <Label text="Selected venues"
+                               styleClass="venue-results-title"/>
+
+                        <ListView fx:id="selectedVenuesListView"
+                                  prefHeight="145"
+                                  minHeight="145"
+                                  maxHeight="145"
+                                  styleClass="venue-results-list"/>
+                    </VBox>
+
+                    <HBox spacing="12"
+                          alignment="CENTER_LEFT"
+                          styleClass="google-search-filters-row">
+
+                        <ComboBox fx:id="metricComboBox"
+                                  promptText="Line metric"
+                                  prefWidth="230"
+                                  styleClass="form-control"/>
+
+                        <ComboBox fx:id="fromYearComboBox"
+                                  promptText="From year"
+                                  prefWidth="155"
+                                  styleClass="form-control"/>
+
+                        <ComboBox fx:id="toYearComboBox"
+                                  promptText="To year"
+                                  prefWidth="155"
+                                  styleClass="form-control"/>
+
+                        <Button fx:id="loadChartButton"
+                                text="Load Venue Analysis"
+                                onAction="#loadVenueAnalysis"
+                                styleClass="primary-button"/>
+
+                        <Button fx:id="removeSelectedButton"
+                                text="Remove Selected"
+                                onAction="#removeSelectedVenue"
+                                styleClass="secondary-button"/>
+
+                        <Label text="To year must be ≥ From year"
+                               styleClass="hint-label"/>
+                    </HBox>
+                </VBox>
+
+                <VBox spacing="16"
+                      styleClass="dashboard-panel charts-dashboard"
+                      maxWidth="1500">
+
+                    <HBox alignment="CENTER_LEFT">
+                        <VBox spacing="4" HBox.hgrow="ALWAYS">
+                            <Label text="Yearly Comparison Line Chart"
+                                   styleClass="content-title"/>
+
+                            <Label text="Each selected venue is displayed as a separate line. X-axis is year and Y-axis is the selected metric."
+                                   wrapText="true"
+                                   styleClass="stat-muted"/>
+                        </VBox>
+
+                        <Label text="LINE CHART"
+                               styleClass="small-blue-chip"/>
+                    </HBox>
+
+                    <VBox spacing="8"
+                          styleClass="chart-card"
+                          maxWidth="1500">
+
+                        <LineChart fx:id="comparisonLineChart"
+                                   prefHeight="430"
+                                   minHeight="410"
+                                   animated="false"
+                                   createSymbols="true"
+                                   legendVisible="false"
+                                   horizontalGridLinesVisible="true"
+                                   verticalGridLinesVisible="true"
+                                   alternativeRowFillVisible="false"
+                                   alternativeColumnFillVisible="false"
+                                   styleClass="beautiful-line-chart">
+
+                            <xAxis>
+                                <NumberAxis fx:id="yearAxis"
+                                            label="Year"
+                                            forceZeroInRange="false"
+                                            minorTickVisible="false"/>
+                            </xAxis>
+
+                            <yAxis>
+                                <NumberAxis fx:id="valueAxis"
+                                            label="Value"
+                                            forceZeroInRange="true"
+                                            minorTickVisible="false"/>
+                            </yAxis>
+                        </LineChart>
+                    </VBox>
+
+                    <VBox fx:id="lineChartLegendBox"
+                          spacing="8"
+                          styleClass="chart-card"
+                          visible="false"
+                          managed="false"
+                          maxWidth="1500">
+
+                        <Label text="Legend"
+                               styleClass="chart-card-title"/>
+
+                        <FlowPane fx:id="lineChartLegendFlow"
+                                  hgap="10"
+                                  vgap="8"
+                                  prefWrapLength="1200"/>
+                    </VBox>
+                </VBox>
+
+                <VBox spacing="16"
+                      styleClass="dashboard-panel charts-dashboard"
+                      maxWidth="1500">
+
+                    <HBox alignment="CENTER_LEFT">
+                        <VBox spacing="4" HBox.hgrow="ALWAYS">
+                            <Label text="Aggregate Bar Charts"
+                                   styleClass="content-title"/>
+
+                            <Label text="The selected venues are compared through total and average publication metrics."
+                                   wrapText="true"
+                                   styleClass="stat-muted"/>
+                        </VBox>
+
+                        <Label text="BAR CHARTS"
+                               styleClass="small-blue-chip"/>
+                    </HBox>
+
+                    <HBox spacing="14"
+                          alignment="TOP_CENTER"
+                          styleClass="charts-row">
+
+                        <VBox spacing="8"
+                              styleClass="chart-card"
+                              HBox.hgrow="ALWAYS"
+                              minWidth="320">
+
+                            <Label text="Total Articles"
+                                   styleClass="chart-card-title"/>
+
+                            <BarChart fx:id="totalArticlesBarChart"
+                                      prefHeight="325"
+                                      minHeight="315"
+                                      animated="false"
+                                      legendVisible="false"
+                                      horizontalGridLinesVisible="true"
+                                      verticalGridLinesVisible="false"
+                                      alternativeRowFillVisible="false"
+                                      alternativeColumnFillVisible="false"
+                                      styleClass="beautiful-line-chart">
+
+                                <xAxis>
+                                    <CategoryAxis fx:id="totalArticlesCategoryAxis"/>
+                                </xAxis>
+
+                                <yAxis>
+                                    <NumberAxis fx:id="totalArticlesValueAxis"
+                                                label="Total articles"
+                                                forceZeroInRange="true"
+                                                minorTickVisible="false"/>
+                                </yAxis>
+                            </BarChart>
+                        </VBox>
+
+                        <VBox spacing="8"
+                              styleClass="chart-card"
+                              HBox.hgrow="ALWAYS"
+                              minWidth="320">
+
+                            <Label text="Avg Articles / Year"
+                                   styleClass="chart-card-title"/>
+
+                            <BarChart fx:id="avgArticlesBarChart"
+                                      prefHeight="325"
+                                      minHeight="315"
+                                      animated="false"
+                                      legendVisible="false"
+                                      horizontalGridLinesVisible="true"
+                                      verticalGridLinesVisible="false"
+                                      alternativeRowFillVisible="false"
+                                      alternativeColumnFillVisible="false"
+                                      styleClass="beautiful-line-chart">
+
+                                <xAxis>
+                                    <CategoryAxis fx:id="avgArticlesCategoryAxis"/>
+                                </xAxis>
+
+                                <yAxis>
+                                    <NumberAxis fx:id="avgArticlesValueAxis"
+                                                label="Avg articles / year"
+                                                forceZeroInRange="true"
+                                                minorTickVisible="false"/>
+                                </yAxis>
+                            </BarChart>
+                        </VBox>
+
+                        <VBox spacing="8"
+                              styleClass="chart-card"
+                              HBox.hgrow="ALWAYS"
+                              minWidth="320">
+
+                            <Label text="Avg Author Entries / Year"
+                                   styleClass="chart-card-title"/>
+
+                            <BarChart fx:id="avgAuthorEntriesBarChart"
+                                      prefHeight="325"
+                                      minHeight="315"
+                                      animated="false"
+                                      legendVisible="false"
+                                      horizontalGridLinesVisible="true"
+                                      verticalGridLinesVisible="false"
+                                      alternativeRowFillVisible="false"
+                                      alternativeColumnFillVisible="false"
+                                      styleClass="beautiful-line-chart">
+
+                                <xAxis>
+                                    <CategoryAxis fx:id="avgAuthorEntriesCategoryAxis"/>
+                                </xAxis>
+
+                                <yAxis>
+                                    <NumberAxis fx:id="avgAuthorEntriesValueAxis"
+                                                label="Avg author entries / year"
+                                                forceZeroInRange="true"
+                                                minorTickVisible="false"/>
+                                </yAxis>
+                            </BarChart>
+                        </VBox>
+                    </HBox>
+
+                    <VBox fx:id="barChartsLegendBox"
+                          spacing="8"
+                          styleClass="chart-card"
+                          visible="false"
+                          managed="false"
+                          maxWidth="1500">
+
+                        <Label text="Legend"
+                               styleClass="chart-card-title"/>
+
+                        <FlowPane fx:id="barChartsLegendFlow"
+                                  hgap="10"
+                                  vgap="8"
+                                  prefWrapLength="1200"/>
+                    </VBox>
+                </VBox>
+            </VBox>
+        </StackPane>
+    </content>
+</ScrollPane>

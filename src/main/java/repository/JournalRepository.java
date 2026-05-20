@@ -7,7 +7,7 @@ import dto.journal.JournalRankingDto;
 import dto.journal.JournalSearchResultDto;
 import dto.journal.JournalYearlyStatsDto;
 import util.SqlFileLoader;
-
+import dto.chart.CategoryOptionDto;
 import java.sql.Connection;
 import java.sql.Date;
 import java.sql.PreparedStatement;
@@ -186,6 +186,32 @@ public class JournalRepository {
 
         } catch (SQLException exception) {
             throw new RuntimeException("Αποτυχία φόρτωσης batch άρθρων περιοδικού.", exception);
+        }
+    }
+
+    public List<CategoryOptionDto> findBestSubjectAreas() {
+        String sql = SqlFileLoader.load("sql/journal/journal_best_subject_areas.sql");
+
+        try (
+                Connection connection = DatabaseManager.getConnection();
+                PreparedStatement statement = connection.prepareStatement(sql);
+                ResultSet rs = statement.executeQuery()
+        ) {
+            List<CategoryOptionDto> results = new ArrayList<>();
+
+            while (rs.next()) {
+                results.add(
+                        new CategoryOptionDto(
+                                String.valueOf(rs.getInt("category_id")),
+                                rs.getString("category_name")
+                        )
+                );
+            }
+
+            return results;
+
+        } catch (SQLException exception) {
+            throw new RuntimeException("Αποτυχία φόρτωσης BestSubjectArea κατηγοριών.", exception);
         }
     }
 

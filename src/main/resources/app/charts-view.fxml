@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.Tab?>
+<?import javafx.scene.control.TabPane?>
+<?import javafx.scene.layout.BorderPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.Region?>
+<?import javafx.scene.layout.StackPane?>
+<?import javafx.scene.layout.VBox?>
+
+<BorderPane xmlns="http://javafx.com/javafx"
+            xmlns:fx="http://javafx.com/fxml"
+            fx:controller="controllers.charts.ChartsPageController"
+            styleClass="root-pane">
+
+    <top>
+        <HBox spacing="16"
+              alignment="CENTER_LEFT"
+              styleClass="top-bar">
+
+            <padding>
+                <Insets top="16" right="26" bottom="16" left="26"/>
+            </padding>
+
+            <VBox spacing="2">
+                <Label text="Research Publications App"
+                       styleClass="app-title"/>
+
+                <Label text="Targeted Visual Analytics"
+                       styleClass="app-subtitle"/>
+            </VBox>
+
+            <Region HBox.hgrow="ALWAYS"/>
+
+            <Button fx:id="backButton"
+                    text="Back to Home"
+                    onAction="#backToHome"
+                    styleClass="top-back-button"/>
+        </HBox>
+    </top>
+
+    <center>
+        <TabPane fx:id="chartsTabPane"
+                 tabClosingPolicy="UNAVAILABLE"
+                 styleClass="modern-tab-pane"
+                 prefWidth="1500">
+
+            <tabs>
+                <Tab fx:id="venueAnalysisTab"
+                     text="Venue Analysis">
+                    <content>
+                        <StackPane fx:id="venueAnalysisContainer"/>
+                    </content>
+                </Tab>
+
+                <Tab fx:id="venueCategoriesTab"
+                     text="Venue Categories">
+                    <content>
+                        <StackPane fx:id="venueCategoriesContainer"/>
+                    </content>
+                </Tab>
+
+                <Tab fx:id="publisherAnalysisTab"
+                     text="Publisher Analysis">
+                    <content>
+                        <StackPane fx:id="publisherAnalysisContainer"/>
+                    </content>
+                </Tab>
+
+                <Tab fx:id="scatterPlotsTab"
+                     text="Scatter Plots">
+                    <content>
+                        <StackPane fx:id="scatterPlotsContainer"/>
+                    </content>
+                </Tab>
+            </tabs>
+        </TabPane>
+    </center>
+
+</BorderPane>

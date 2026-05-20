@@ -7,7 +7,7 @@ import dto.conference.ConferenceRankingDto;
 import dto.conference.ConferenceSearchResultDto;
 import dto.conference.ConferenceYearlyStatsDto;
 import util.SqlFileLoader;
-
+import dto.chart.CategoryOptionDto;
 import java.sql.Connection;
 import java.sql.Date;
 import java.sql.PreparedStatement;
@@ -187,6 +187,32 @@ public class ConferenceRepository {
 
         } catch (SQLException exception) {
             throw new RuntimeException("Αποτυχία φόρτωσης άρθρων συνεδρίου.", exception);
+        }
+    }
+
+    public List<CategoryOptionDto> findPrimaryFoRCategories() {
+        String sql = SqlFileLoader.load("sql/conference/conference_primary_for_categories.sql");
+
+        try (
+                Connection connection = DatabaseManager.getConnection();
+                PreparedStatement statement = connection.prepareStatement(sql);
+                ResultSet rs = statement.executeQuery()
+        ) {
+            List<CategoryOptionDto> results = new ArrayList<>();
+
+            while (rs.next()) {
+                results.add(
+                        new CategoryOptionDto(
+                                String.valueOf(rs.getInt("category_id")),
+                                rs.getString("category_name")
+                        )
+                );
+            }
+
+            return results;
+
+        } catch (SQLException exception) {
+            throw new RuntimeException("Αποτυχία φόρτωσης PrimaryFoR κατηγοριών.", exception);
         }
     }
 

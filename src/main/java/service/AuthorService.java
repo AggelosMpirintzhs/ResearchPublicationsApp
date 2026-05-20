@@ -293,7 +293,8 @@ public class AuthorService {
         return normalized.toLowerCase(Locale.ROOT)
                 .trim()
                 .replaceAll("[^\\p{L}\\p{Nd}]+", " ")
-                .replaceAll("\\s+", " ");
+                .replaceAll("\\s+", " ")
+                .trim();
     }
 
     private int normalizeSearchLimit(Integer limit) {

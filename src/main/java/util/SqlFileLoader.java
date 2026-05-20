@@ -17,12 +17,11 @@ public final class SqlFileLoader {
     }
 
     public static String load(String path) {
-        return CACHE.computeIfAbsent(path, SqlFileLoader::readSqlFile);
+        String normalizedPath = normalizePath(path);
+        return CACHE.computeIfAbsent(normalizedPath, SqlFileLoader::readSqlFile);
     }
 
-    private static String readSqlFile(String path) {
-        String normalizedPath = normalizePath(path);
-
+    private static String readSqlFile(String normalizedPath) {
         InputStream inputStream = SqlFileLoader.class
                 .getClassLoader()
                 .getResourceAsStream(normalizedPath);
