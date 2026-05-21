@@ -10,20 +10,15 @@ import javafx.scene.control.Label;
 import javafx.scene.control.Tab;
 import javafx.scene.control.TabPane;
 import javafx.scene.layout.StackPane;
+import service.charts.ChartsPageService;
+import service.charts.ChartsPageService.ChartTab;
 
 import java.io.IOException;
-import java.util.HashSet;
 import java.util.Objects;
-import java.util.Set;
 
 public class ChartsPageController {
 
-    private static final String HOME_FXML_PATH = "/app/hello-view.fxml";
-
-    private static final String VENUE_ANALYSIS_FXML = "/app/charts/venue-analysis-tab.fxml";
-    private static final String VENUE_CATEGORIES_FXML = "/app/charts/venue-categories-tab.fxml";
-    private static final String PUBLISHER_ANALYSIS_FXML = "/app/charts/publisher-analysis-tab.fxml";
-    private static final String SCATTER_PLOTS_FXML = "/app/charts/scatter-plots-tab.fxml";
+    private final ChartsPageService chartsPageService = new ChartsPageService();
 
     @FXML
     private Button backButton;
@@ -55,10 +50,6 @@ public class ChartsPageController {
     @FXML
     private StackPane scatterPlotsContainer;
 
-    private final Set<Tab> loadedTabs = new HashSet<>();
-
-    private boolean venueCategoriesOptionsStarted = false;
-
     @FXML
     public void initialize() {
         if (chartsTabPane == null) {
@@ -69,61 +60,65 @@ public class ChartsPageController {
                 .selectedItemProperty()
                 .addListener((observable, oldTab, newTab) -> loadSelectedTab(newTab));
 
-        /*
-         * Σημαντικό:
-         * Το Platform.runLater κάνει το αρχικό tab να φορτώσει αφού πρώτα εμφανιστεί η σελίδα.
-         * Έτσι το πάτημα από την αρχική στο Charts δεν μπλοκάρει από τα tab FXML.
-         */
         Platform.runLater(() -> loadSelectedTab(chartsTabPane.getSelectionModel().getSelectedItem()));
     }
 
     private void loadSelectedTab(Tab selectedTab) {
-        if (selectedTab == null) {
+        ChartTab chartTab = resolveChartTab(selectedTab);
+
+        if (chartTab == null) {
             return;
+        }
+
+        StackPane container = resolveContainer(chartTab);
+        String fxmlPath = chartsPageService.getFxmlPath(chartTab);
+
+        loadTabContent(chartTab, container, fxmlPath);
+    }
+
+    private ChartTab resolveChartTab(Tab selectedTab) {
+        if (selectedTab == null) {
+            return null;
         }
 
         if (selectedTab == venueAnalysisTab) {
-            loadTabContent(
-                    venueAnalysisTab,
-                    venueAnalysisContainer,
-                    VENUE_ANALYSIS_FXML
-            );
-            return;
+            return ChartTab.VENUE_ANALYSIS;
         }
 
         if (selectedTab == venueCategoriesTab) {
-            loadTabContent(
-                    venueCategoriesTab,
-                    venueCategoriesContainer,
-                    VENUE_CATEGORIES_FXML
-            );
-            return;
+            return ChartTab.VENUE_CATEGORIES;
         }
 
         if (selectedTab == publisherAnalysisTab) {
-            loadTabContent(
-                    publisherAnalysisTab,
-                    publisherAnalysisContainer,
-                    PUBLISHER_ANALYSIS_FXML
-            );
-            return;
+            return ChartTab.PUBLISHER_ANALYSIS;
         }
 
         if (selectedTab == scatterPlotsTab) {
-            loadTabContent(
-                    scatterPlotsTab,
-                    scatterPlotsContainer,
-                    SCATTER_PLOTS_FXML
-            );
+            return ChartTab.SCATTER_PLOTS;
         }
+
+        return null;
     }
 
-    private void loadTabContent(Tab tab, StackPane container, String fxmlPath) {
-        if (tab == null || container == null || fxmlPath == null || fxmlPath.isBlank()) {
+    private StackPane resolveContainer(ChartTab chartTab) {
+        if (chartTab == null) {
+            return null;
+        }
+
+        return switch (chartTab) {
+            case VENUE_ANALYSIS -> venueAnalysisContainer;
+            case VENUE_CATEGORIES -> venueCategoriesContainer;
+            case PUBLISHER_ANALYSIS -> publisherAnalysisContainer;
+            case SCATTER_PLOTS -> scatterPlotsContainer;
+        };
+    }
+
+    private void loadTabContent(ChartTab chartTab, StackPane container, String fxmlPath) {
+        if (chartTab == null || container == null || fxmlPath == null || fxmlPath.isBlank()) {
             return;
         }
 
-        if (loadedTabs.contains(tab)) {
+        if (!chartsPageService.shouldLoadTab(chartTab)) {
             return;
         }
 
@@ -143,18 +138,9 @@ public class ChartsPageController {
             Parent content = loader.load();
 
             container.getChildren().setAll(content);
-            loadedTabs.add(tab);
+            chartsPageService.markTabAsLoaded(chartTab);
 
-            if (tab == venueCategoriesTab) {
-                Object controller = loader.getController();
-
-                if (controller instanceof VenueCategoriesController venueCategoriesController
-                        && !venueCategoriesOptionsStarted) {
-
-                    venueCategoriesOptionsStarted = true;
-                    venueCategoriesController.loadCategoryOptionsInBackground();
-                }
-            }
+            startExtraTabInitializationIfNeeded(chartTab, loader);
 
         } catch (IOException | NullPointerException exception) {
             exception.printStackTrace();
@@ -166,13 +152,25 @@ public class ChartsPageController {
         }
     }
 
+    private void startExtraTabInitializationIfNeeded(ChartTab chartTab, FXMLLoader loader) {
+        if (!chartsPageService.shouldStartVenueCategoriesOptions(chartTab)) {
+            return;
+        }
+
+        Object controller = loader.getController();
+
+        if (controller instanceof VenueCategoriesController venueCategoriesController) {
+            venueCategoriesController.loadCategoryOptionsInBackground();
+        }
+    }
+
     @FXML
     private void backToHome() {
         try {
             Parent root = FXMLLoader.load(
                     Objects.requireNonNull(
-                            getClass().getResource(HOME_FXML_PATH),
-                            "Cannot find " + HOME_FXML_PATH
+                            getClass().getResource(chartsPageService.getHomeFxmlPath()),
+                            "Cannot find " + chartsPageService.getHomeFxmlPath()
                     )
             );
 

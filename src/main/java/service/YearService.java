@@ -32,18 +32,22 @@ public class YearService {
 
     private final YearRepository yearRepository;
 
+    // Creates year service
     public YearService() {
         this.yearRepository = new YearRepository();
     }
 
+    // Creates year service
     public YearService(YearRepository yearRepository) {
         this.yearRepository = yearRepository;
     }
 
+    // Gets available years
     public List<AvailableYearDto> getAvailableYears() {
         return yearRepository.findAvailableYears();
     }
 
+    // Loads year page
     public YearPageData loadYearPageData(
             int year,
             String publicationType
@@ -67,12 +71,14 @@ public class YearService {
         );
     }
 
+    // Gets year profile
     public Optional<YearProfileDto> getYearProfile(int year) {
         validateYear(year);
 
         return yearRepository.findYearProfile(year);
     }
 
+    // Gets publication count
     public long getExpectedPublicationCount(
             AvailableYearDto yearDto,
             String publicationType
@@ -94,6 +100,7 @@ public class YearService {
         return nullToZero(yearDto.totalArticles());
     }
 
+    // Gets publication count
     public long getExpectedPublicationCount(
             YearProfileDto profile,
             String publicationType
@@ -115,6 +122,7 @@ public class YearService {
         return nullToZero(profile.totalArticles());
     }
 
+    // Loads publication batches
     public void loadYearPublicationsInBatches(
             int year,
             String publicationType,
@@ -130,11 +138,11 @@ public class YearService {
         validateYear(year);
 
         if (onBatchLoaded == null) {
-            throw new IllegalArgumentException("Το onBatchLoaded δεν μπορεί να είναι null.");
+            throw new IllegalArgumentException("onBatchLoaded cannot be null.");
         }
 
         if (shouldContinue == null) {
-            throw new IllegalArgumentException("Το shouldContinue δεν μπορεί να είναι null.");
+            throw new IllegalArgumentException("shouldContinue cannot be null.");
         }
 
         String safePublicationType = normalizePublicationType(publicationType);
@@ -188,6 +196,7 @@ public class YearService {
         }
     }
 
+    // Gets year publications
     public List<YearPublicationDto> getYearPublications(
             int year,
             String publicationType,
@@ -218,6 +227,7 @@ public class YearService {
         );
     }
 
+    // Gets publications batch
     public List<YearPublicationDto> getYearPublicationsBatch(
             int year,
             String publicationType,
@@ -255,6 +265,7 @@ public class YearService {
         );
     }
 
+    // Gets all publications
     public List<YearPublicationDto> getAllYearPublications(int year) {
         return getYearPublications(
                 year,
@@ -265,6 +276,7 @@ public class YearService {
         );
     }
 
+    // Gets journal publications
     public List<YearPublicationDto> getYearJournalPublications(int year) {
         return getYearPublications(
                 year,
@@ -275,6 +287,7 @@ public class YearService {
         );
     }
 
+    // Gets conference publications
     public List<YearPublicationDto> getYearConferencePublications(int year) {
         return getYearPublications(
                 year,
@@ -285,6 +298,7 @@ public class YearService {
         );
     }
 
+    // Gets journal filter
     public List<YearPublicationDto> getYearPublicationsByJournal(
             int year,
             int journalId
@@ -298,6 +312,7 @@ public class YearService {
         );
     }
 
+    // Gets conference filter
     public List<YearPublicationDto> getYearPublicationsByConference(
             int year,
             int conferenceId
@@ -311,6 +326,7 @@ public class YearService {
         );
     }
 
+    // Gets author filter
     public List<YearPublicationDto> getYearPublicationsByAuthor(
             int year,
             int authorId
@@ -324,6 +340,7 @@ public class YearService {
         );
     }
 
+    // Gets all batch
     public List<YearPublicationDto> getAllYearPublicationsBatch(
             int year,
             Integer lastArticleId,
@@ -340,6 +357,7 @@ public class YearService {
         );
     }
 
+    // Gets journal batch
     public List<YearPublicationDto> getYearJournalPublicationsBatch(
             int year,
             Integer lastArticleId,
@@ -356,6 +374,7 @@ public class YearService {
         );
     }
 
+    // Gets conference batch
     public List<YearPublicationDto> getYearConferencePublicationsBatch(
             int year,
             Integer lastArticleId,
@@ -372,6 +391,7 @@ public class YearService {
         );
     }
 
+    // Gets journal batch
     public List<YearPublicationDto> getYearPublicationsByJournalBatch(
             int year,
             int journalId,
@@ -389,6 +409,7 @@ public class YearService {
         );
     }
 
+    // Gets conference batch
     public List<YearPublicationDto> getYearPublicationsByConferenceBatch(
             int year,
             int conferenceId,
@@ -406,6 +427,7 @@ public class YearService {
         );
     }
 
+    // Gets author batch
     public List<YearPublicationDto> getYearPublicationsByAuthorBatch(
             int year,
             int authorId,
@@ -423,12 +445,14 @@ public class YearService {
         );
     }
 
+    // Validates year value
     private void validateYear(int year) {
         if (year <= 0) {
-            throw new IllegalArgumentException("Το year πρέπει να είναι θετικός αριθμός.");
+            throw new IllegalArgumentException("year must be a positive number.");
         }
     }
 
+    // Normalizes publication type
     private String normalizePublicationType(String publicationType) {
         if (publicationType == null || publicationType.isBlank()) {
             return DEFAULT_PUBLICATION_TYPE;
@@ -438,37 +462,40 @@ public class YearService {
 
         if (!ALLOWED_PUBLICATION_TYPES.contains(normalizedPublicationType)) {
             throw new IllegalArgumentException(
-                    "Μη έγκυρος τύπος δημοσίευσης. Επιτρεπτές τιμές: ALL, JOURNAL, CONFERENCE."
+                    "Invalid publication type. Allowed values: ALL, JOURNAL, CONFERENCE."
             );
         }
 
         return normalizedPublicationType;
     }
 
+    // Normalizes filter id
     private int normalizeFilterId(Integer id, String fieldName) {
         if (id == null) {
             return DEFAULT_FILTER_ID;
         }
 
         if (id < 0) {
-            throw new IllegalArgumentException("Το " + fieldName + " δεν μπορεί να είναι αρνητικό.");
+            throw new IllegalArgumentException(fieldName + " cannot be negative.");
         }
 
         return id;
     }
 
+    // Normalizes article id
     private int normalizeLastArticleId(Integer lastArticleId) {
         if (lastArticleId == null) {
             return DEFAULT_LAST_ARTICLE_ID;
         }
 
         if (lastArticleId < 0) {
-            throw new IllegalArgumentException("Το lastArticleId δεν μπορεί να είναι αρνητικό.");
+            throw new IllegalArgumentException("lastArticleId cannot be negative.");
         }
 
         return lastArticleId;
     }
 
+    // Normalizes batch size
     private int normalizeBatchSize(Integer batchSize) {
         if (batchSize == null || batchSize <= 0) {
             return DEFAULT_BATCH_SIZE;
@@ -477,6 +504,7 @@ public class YearService {
         return Math.min(batchSize, MAX_BATCH_SIZE);
     }
 
+    // Validates filter combination
     private void validateFilterCombination(
             String publicationType,
             int journalId,
@@ -484,23 +512,24 @@ public class YearService {
     ) {
         if (journalId > 0 && conferenceId > 0) {
             throw new IllegalArgumentException(
-                    "Δεν μπορείς να φιλτράρεις ταυτόχρονα με journalId και conferenceId."
+                    "Cannot filter by journalId and conferenceId at the same time."
             );
         }
 
         if (journalId > 0 && publicationType.equals(PUBLICATION_TYPE_CONFERENCE)) {
             throw new IllegalArgumentException(
-                    "Δεν μπορείς να έχεις publicationType = CONFERENCE και journalId φίλτρο."
+                    "Cannot use publicationType = CONFERENCE with a journalId filter."
             );
         }
 
         if (conferenceId > 0 && publicationType.equals(PUBLICATION_TYPE_JOURNAL)) {
             throw new IllegalArgumentException(
-                    "Δεν μπορείς να έχεις publicationType = JOURNAL και conferenceId φίλτρο."
+                    "Cannot use publicationType = JOURNAL with a conferenceId filter."
             );
         }
     }
 
+    // Converts null value
     private long nullToZero(Long value) {
         return value == null ? 0L : value;
     }
@@ -511,6 +540,7 @@ public class YearService {
             YearProfileDto profile,
             long expectedPublicationCount
     ) {
+        // Checks profile exists
         public boolean hasProfile() {
             return profile != null;
         }

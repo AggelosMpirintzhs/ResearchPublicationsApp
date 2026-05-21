@@ -34,6 +34,9 @@ import javafx.scene.control.TableView;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.VBox;
 import javafx.util.Duration;
+import javafx.scene.input.KeyCode;
+import javafx.scene.input.MouseButton;
+import javafx.scene.input.KeyEvent;
 import service.VenueService;
 import util.TableCopySupport;
 import util.TableSearchSupport;
@@ -223,6 +226,7 @@ public class VenueController {
         setupArticleSearchSupport();
         setupLoadArticlesOption();
         setupYearlyCharts();
+        setupEnterKeyBehavior();
 
         clearVenueResults();
         setSelectedVenue(null);
@@ -703,7 +707,45 @@ public class VenueController {
             }
         });
 
-        venueSearchField.setOnAction(event -> searchVenues());
+        venueSearchField.setOnAction(event -> event.consume());
+    }
+
+    private void setupEnterKeyBehavior() {
+        Platform.runLater(() -> {
+            if (venueResultsListView == null || venueResultsListView.getScene() == null) {
+                return;
+            }
+
+            venueResultsListView.getScene().addEventFilter(KeyEvent.KEY_PRESSED, event -> {
+                if (event.getCode() != KeyCode.ENTER) {
+                    return;
+                }
+
+                Object selected = null;
+
+                if (venueResultsListView != null) {
+                    selected = venueResultsListView.getSelectionModel().getSelectedItem();
+                }
+
+                if (selected == null) {
+                    selected = selectedVenue;
+                }
+
+                /*
+                 * Important:
+                 * We always consume ENTER so it cannot trigger another focused/default button,
+                 * for example the Back/Home action.
+                 */
+                event.consume();
+
+                if (selected == null) {
+                    return;
+                }
+
+                setSelectedVenue(selected);
+                loadVenueProfile();
+            });
+        });
     }
 
     private void setupVenueResultsListView() {
@@ -713,17 +755,33 @@ public class VenueController {
 
         venueResultsListView.setPlaceholder(new Label("Search results will appear here."));
 
-        venueResultsListView.setCellFactory(listView -> new ListCell<>() {
-            @Override
-            protected void updateItem(Object venue, boolean empty) {
-                super.updateItem(venue, empty);
+        venueResultsListView.setCellFactory(listView -> {
+            ListCell<Object> cell = new ListCell<>() {
+                @Override
+                protected void updateItem(Object venue, boolean empty) {
+                    super.updateItem(venue, empty);
 
-                if (empty || venue == null) {
-                    setText(null);
-                } else {
-                    setText(getVenueDisplayName(venue));
+                    if (empty || venue == null) {
+                        setText(null);
+                    } else {
+                        setText(getVenueDisplayName(venue));
+                    }
                 }
-            }
+            };
+
+            cell.setOnMouseClicked(event -> {
+                if (
+                        event.getButton() == MouseButton.PRIMARY
+                                && event.getClickCount() == 2
+                                && !cell.isEmpty()
+                ) {
+                    venueResultsListView.getSelectionModel().select(cell.getItem());
+                    openSelectedVenueProfile();
+                    event.consume();
+                }
+            });
+
+            return cell;
         });
 
         venueResultsListView.getSelectionModel().selectedItemProperty().addListener(
@@ -735,6 +793,31 @@ public class VenueController {
                     }
                 }
         );
+
+        venueResultsListView.setOnKeyPressed(event -> {
+            if (event.getCode() == KeyCode.ENTER) {
+                event.consume();
+
+                if (venueResultsListView.getSelectionModel().getSelectedItem() != null) {
+                    openSelectedVenueProfile();
+                }
+            }
+        });
+    }
+
+    private void openSelectedVenueProfile() {
+        if (venueResultsListView == null) {
+            return;
+        }
+
+        Object selected = venueResultsListView.getSelectionModel().getSelectedItem();
+
+        if (selected == null) {
+            return;
+        }
+
+        setSelectedVenue(selected);
+        loadVenueProfile();
     }
 
     private void setupLoadArticlesOption() {

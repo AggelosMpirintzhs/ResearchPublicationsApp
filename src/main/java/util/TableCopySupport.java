@@ -17,24 +17,19 @@ import java.util.List;
 
 public final class TableCopySupport {
 
+    // Prevents object creation
     private TableCopySupport() {
     }
 
+    // Enables cell copy
     public static <S> void enableCellCopy(TableView<S> tableView) {
         if (tableView == null) {
             return;
         }
 
-        /*
-         * Single click:
-         * Επιλέγεται κελί αντί για ολόκληρη γραμμή.
-         */
         tableView.getSelectionModel().setCellSelectionEnabled(true);
         tableView.getSelectionModel().setSelectionMode(SelectionMode.MULTIPLE);
 
-        /*
-         * Χρειάζεται focus για να πιάνει σωστά το Ctrl+C / Cmd+C.
-         */
         tableView.setFocusTraversable(true);
         tableView.setOnMouseClicked(event -> tableView.requestFocus());
 
@@ -43,6 +38,7 @@ public final class TableCopySupport {
         );
     }
 
+    // Makes text selectable
     public static <S> void makeStringColumnTextSelectable(TableColumn<S, String> column) {
         if (column == null) {
             return;
@@ -60,9 +56,6 @@ public final class TableCopySupport {
                                 "-fx-padding: 0;"
                 );
 
-                /*
-                 * Escape: επιστροφή σε normal προβολή κελιού.
-                 */
                 textField.setOnKeyPressed(event -> {
                     if (event.getCode() == KeyCode.ESCAPE) {
                         showTextOnly();
@@ -70,20 +63,12 @@ public final class TableCopySupport {
                     }
                 });
 
-                /*
-                 * Αν κάνουμε click έξω, κλείνει το selectable mode.
-                 */
                 textField.focusedProperty().addListener((observable, oldValue, focused) -> {
                     if (!focused) {
                         showTextOnly();
                     }
                 });
 
-                /*
-                 * Double click:
-                 * Το κελί γίνεται read-only TextField ώστε να μπορείς
-                 * να επιλέξεις συγκεκριμένο κομμάτι του κειμένου.
-                 */
                 setOnMouseClicked(event -> {
                     if (!isEmpty() && event.getClickCount() == 2) {
                         showTextField();
@@ -92,6 +77,7 @@ public final class TableCopySupport {
                 });
             }
 
+            // Updates cell text
             @Override
             protected void updateItem(String item, boolean empty) {
                 super.updateItem(item, empty);
@@ -112,11 +98,13 @@ public final class TableCopySupport {
                 setGraphic(null);
             }
 
+            // Shows plain text
             private void showTextOnly() {
                 setGraphic(null);
                 setText(getItem() == null ? "" : getItem());
             }
 
+            // Shows text field
             private void showTextField() {
                 String text = getItem() == null ? "" : getItem();
 
@@ -130,12 +118,9 @@ public final class TableCopySupport {
         });
     }
 
+    // Copies selected cells
     @SuppressWarnings({"rawtypes", "unchecked"})
     private static <S> void copySelectedCells(TableView<S> tableView, KeyEvent event) {
-        /*
-         * isShortcutDown:
-         * Ctrl σε Windows/Linux, Cmd σε Mac.
-         */
         if (!event.isShortcutDown() || event.getCode() != KeyCode.C) {
             return;
         }

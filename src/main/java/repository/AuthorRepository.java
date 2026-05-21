@@ -18,6 +18,7 @@ import java.util.Optional;
 
 public class AuthorRepository {
 
+    // Searches author records
     public List<AuthorSearchResultDto> searchAuthors(String searchText, int limit) {
         String sql = SqlFileLoader.load("sql/author/search_authors.sql");
 
@@ -50,22 +51,26 @@ public class AuthorRepository {
             }
 
         } catch (SQLException exception) {
-            throw new RuntimeException("Αποτυχία αναζήτησης συγγραφέων.", exception);
+            throw new RuntimeException("Failed to search authors.", exception);
         }
     }
 
+    // Builds prefix pattern
     private String buildPrefixPattern(String searchText) {
         return buildTokenPattern(searchText) + "%";
     }
 
+    // Builds word pattern
     private String buildWordStartPattern(String searchText) {
         return "% " + buildTokenPattern(searchText) + "%";
     }
 
+    // Builds contains pattern
     private String buildContainsPattern(String searchText) {
         return "%" + buildTokenPattern(searchText) + "%";
     }
 
+    // Builds token pattern
     private String buildTokenPattern(String searchText) {
         if (searchText == null || searchText.isBlank()) {
             return "";
@@ -76,8 +81,7 @@ public class AuthorRepository {
                 .replaceAll("\\s+", "%");
     }
 
-
-
+    // Finds author profile
     public Optional<AuthorProfileDto> findAuthorProfile(
             int authorId,
             int startYear,
@@ -102,10 +106,11 @@ public class AuthorRepository {
             }
 
         } catch (SQLException exception) {
-            throw new RuntimeException("Αποτυχία φόρτωσης προφίλ συγγραφέα.", exception);
+            throw new RuntimeException("Failed to load author profile.", exception);
         }
     }
 
+    // Finds yearly stats
     public List<AuthorYearlyStatsDto> findAuthorYearlyStats(
             int authorId,
             int startYear,
@@ -132,10 +137,11 @@ public class AuthorRepository {
             }
 
         } catch (SQLException exception) {
-            throw new RuntimeException("Αποτυχία φόρτωσης yearly stats συγγραφέα.", exception);
+            throw new RuntimeException("Failed to load author yearly stats.", exception);
         }
     }
 
+    // Finds typed stats
     public List<AuthorYearlyStatsByTypeDto> findAuthorYearlyStatsByType(
             int authorId,
             int startYear,
@@ -162,10 +168,11 @@ public class AuthorRepository {
             }
 
         } catch (SQLException exception) {
-            throw new RuntimeException("Αποτυχία φόρτωσης yearly stats ανά τύπο συγγραφέα.", exception);
+            throw new RuntimeException("Failed to load author typed stats.", exception);
         }
     }
 
+    // Finds publications batch
     public List<AuthorPublicationDto> findAuthorPublicationsBatch(
             int authorId,
             int startYear,
@@ -196,10 +203,11 @@ public class AuthorRepository {
             }
 
         } catch (SQLException exception) {
-            throw new RuntimeException("Αποτυχία φόρτωσης batch δημοσιεύσεων συγγραφέα.", exception);
+            throw new RuntimeException("Failed to load author publications batch.", exception);
         }
     }
 
+    // Maps search result
     private AuthorSearchResultDto mapAuthorSearchResult(ResultSet rs) throws SQLException {
         return new AuthorSearchResultDto(
                 getInteger(rs, "author_id"),
@@ -207,6 +215,7 @@ public class AuthorRepository {
         );
     }
 
+    // Maps author profile
     private AuthorProfileDto mapAuthorProfile(ResultSet rs) throws SQLException {
         return new AuthorProfileDto(
                 getInteger(rs, "author_id"),
@@ -227,6 +236,7 @@ public class AuthorRepository {
         );
     }
 
+    // Maps yearly stats
     private AuthorYearlyStatsDto mapAuthorYearlyStats(ResultSet rs) throws SQLException {
         return new AuthorYearlyStatsDto(
                 getInteger(rs, "year"),
@@ -234,6 +244,7 @@ public class AuthorRepository {
         );
     }
 
+    // Maps typed stats
     private AuthorYearlyStatsByTypeDto mapAuthorYearlyStatsByType(ResultSet rs) throws SQLException {
         return new AuthorYearlyStatsByTypeDto(
                 getInteger(rs, "year"),
@@ -243,6 +254,7 @@ public class AuthorRepository {
         );
     }
 
+    // Maps author publication
     private AuthorPublicationDto mapAuthorPublication(ResultSet rs) throws SQLException {
         return new AuthorPublicationDto(
                 getInteger(rs, "article_id"),
@@ -269,16 +281,19 @@ public class AuthorRepository {
         );
     }
 
+    // Gets integer value
     private Integer getInteger(ResultSet rs, String columnName) throws SQLException {
         int value = rs.getInt(columnName);
         return rs.wasNull() ? null : value;
     }
 
+    // Gets long value
     private Long getLong(ResultSet rs, String columnName) throws SQLException {
         long value = rs.getLong(columnName);
         return rs.wasNull() ? null : value;
     }
 
+    // Gets double value
     private Double getDouble(ResultSet rs, String columnName) throws SQLException {
         double value = rs.getDouble(columnName);
         return rs.wasNull() ? null : value;

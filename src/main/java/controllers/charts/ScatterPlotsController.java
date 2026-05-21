@@ -1,9 +1,5 @@
 package controllers.charts;
 
-import dto.conference.ConferenceSearchResultDto;
-import dto.conference.ConferenceYearlyStatsDto;
-import dto.journal.JournalSearchResultDto;
-import dto.journal.JournalYearlyStatsDto;
 import javafx.animation.PauseTransition;
 import javafx.application.Platform;
 import javafx.concurrent.Task;
@@ -20,6 +16,7 @@ import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
+import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextField;
 import javafx.scene.control.Tooltip;
 import javafx.scene.input.MouseButton;
@@ -28,32 +25,20 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 import javafx.util.Duration;
-import service.ConferenceService;
-import service.JournalService;
+import service.charts.ScatterPlotsService;
 
-import java.lang.reflect.Field;
-import java.lang.reflect.Method;
-import java.text.Normalizer;
-import java.time.LocalDate;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 
 public class ScatterPlotsController {
 
-    private static final String TYPE_JOURNAL = "Journal";
-    private static final String TYPE_CONFERENCE = "Conference";
-
-    private static final String METRIC_ARTICLES = "Published articles";
-    private static final String METRIC_AUTHOR_ENTRIES = "Total author entries";
-
-    private static final int MIN_YEAR = 1900;
+    private static final int MIN_YEAR = ScatterPlotsService.DEFAULT_MIN_YEAR;
     private static final int SEARCH_LIMIT = 20;
     private static final int MAX_SELECTED_VENUES = 10;
     private static final int MIN_SEARCH_LENGTH = 3;
     private static final int SEARCH_DEBOUNCE_MS = 250;
-    private static final int DEFAULT_RANKING_LIMIT = 150;
+    private static final int DEFAULT_RANKING_LIMIT = 100;
 
     private static final String[] CHART_COLORS = {
             "#1f5fa8",
@@ -68,21 +53,7 @@ public class ScatterPlotsController {
             "#2e7d32"
     };
 
-    private static final String[] RANKING_METRICS = {
-            "Total Docs",
-            "Total Docs 3y",
-            "Total Refs",
-            "Total Cites 3y",
-            "Citable Docs 3y",
-            "Cites / Doc 2y",
-            "Refs / Doc",
-            "SJR",
-            "Cite Score",
-            "H index"
-    };
-
-    private final JournalService journalService = new JournalService();
-    private final ConferenceService conferenceService = new ConferenceService();
+    private final ScatterPlotsService scatterPlotsService = new ScatterPlotsService();
 
     private Object selectedSearchVenue;
     private PauseTransition searchDebounce;
@@ -92,6 +63,9 @@ public class ScatterPlotsController {
 
     private final List<ChartHighlightHandle> chartHighlightHandles = new ArrayList<>();
     private final List<LegendHighlightHandle> legendHighlightHandles = new ArrayList<>();
+
+    @FXML
+    private ScrollPane scatterPageScrollPane;
 
     @FXML
     private ComboBox<String> scatterVenueTypeComboBox;
@@ -118,7 +92,7 @@ public class ScatterPlotsController {
     private ListView<Object> scatterSearchResultsListView;
 
     @FXML
-    private ListView<SelectedVenue> scatterSelectedVenuesListView;
+    private ListView<ScatterPlotsService.SelectedVenue> scatterSelectedVenuesListView;
 
     @FXML
     private ComboBox<Integer> scatterFromYearComboBox;
@@ -151,10 +125,7 @@ public class ScatterPlotsController {
     private ComboBox<String> rankingYMetricComboBox;
 
     @FXML
-    private ComboBox<Integer> rankingLimitComboBox;
-
-    @FXML
-    private TextField rankingJournalFilterField;
+    private ComboBox<String> rankingLimitComboBox;
 
     @FXML
     private Button loadRankingScatterButton;
@@ -192,7 +163,7 @@ public class ScatterPlotsController {
         clearRankingScatterOnly();
 
         setVenueStatus("Choose journals/conferences and load venue scatter.");
-        setRankingStatus("Choose ranking metrics and load journal ranking scatter.");
+        setRankingStatus("Choose ranking metrics and top N limit, then load journal ranking scatter.");
     }
 
     @FXML
@@ -208,15 +179,13 @@ public class ScatterPlotsController {
         String venueType = getSelectedVenueType();
         String searchText = scatterVenueSearchField == null ? "" : scatterVenueSearchField.getText().trim();
 
-        if (venueSearchTask != null && venueSearchTask.isRunning()) {
-            venueSearchTask.cancel();
-        }
+        stopCurrentVenueSearchTaskOnly();
 
         if (venueType == null || venueType.isBlank()) {
             clearSearchResults();
 
             if (showAlerts) {
-                showError("Δεν επιλέχθηκε τύπος", "Πρέπει πρώτα να επιλέξεις Journal ή Conference.");
+                showError("No venue type selected", "You must select Journal or Conference first.");
             }
 
             return;
@@ -227,9 +196,9 @@ public class ScatterPlotsController {
             clearSearchResults();
 
             if (showAlerts && searchText.isBlank()) {
-                showError("Λάθος αναζήτηση", "Πρέπει να γράψεις όνομα journal ή conference.");
+                showError("Invalid search", "You must type a journal or conference name.");
             } else if (showAlerts) {
-                showError("Λάθος αναζήτηση", "Πρέπει να γράψεις τουλάχιστον 3 χαρακτήρες.");
+                showError("Invalid search", "You must type at least 3 characters.");
             }
 
             return;
@@ -241,35 +210,29 @@ public class ScatterPlotsController {
         selectedSearchVenue = null;
         clearSearchResultsOnly();
 
-        venueSearchTask = new Task<>() {
+        Task<List<Object>> task = new Task<>() {
             @Override
             protected List<Object> call() {
-                List<Object> results = new ArrayList<>();
-
-                if (TYPE_JOURNAL.equals(requestedVenueType)) {
-                    results.addAll(journalService.searchJournals(requestedSearchText, SEARCH_LIMIT));
-                    return results;
-                }
-
-                if (TYPE_CONFERENCE.equals(requestedVenueType)) {
-                    results.addAll(conferenceService.searchConferences(requestedSearchText, SEARCH_LIMIT));
-                    return results;
-                }
-
-                return results;
+                return scatterPlotsService.searchVenues(
+                        requestedVenueType,
+                        requestedSearchText,
+                        SEARCH_LIMIT
+                );
             }
         };
+
+        venueSearchTask = task;
 
         if (showAlerts) {
             setVenueLoading(true);
         }
 
-        venueSearchTask.setOnSucceeded(event -> {
+        task.setOnSucceeded(event -> {
             if (showAlerts) {
                 setVenueLoading(false);
             }
 
-            if (venueSearchTask.isCancelled()) {
+            if (task.isCancelled()) {
                 return;
             }
 
@@ -284,32 +247,34 @@ public class ScatterPlotsController {
                 return;
             }
 
-            List<Object> results = sortVenueResultsByRelevance(venueSearchTask.getValue(), requestedSearchText);
+            List<Object> results = task.getValue();
             renderSearchResults(results);
 
-            if (results.isEmpty() && showAlerts) {
-                showInfo(
-                        "Δεν βρέθηκαν αποτελέσματα",
-                        "Δεν βρέθηκε journal/conference με αυτό το κείμενο αναζήτησης."
-                );
+            if (results == null || results.isEmpty()) {
+                if (showAlerts) {
+                    showInfo(
+                            "No results found",
+                            "No journal or conference was found for this search text."
+                    );
+                }
             }
         });
 
-        venueSearchTask.setOnFailed(event -> {
+        task.setOnFailed(event -> {
             if (showAlerts) {
                 setVenueLoading(false);
             }
 
-            Throwable exception = venueSearchTask.getException();
+            Throwable exception = task.getException();
 
             if (showAlerts) {
-                showError("Σφάλμα αναζήτησης", exception == null ? null : exception.getMessage());
+                showError("Search failed", exception == null ? null : exception.getMessage());
             } else {
                 clearSearchResults();
             }
         });
 
-        startBackgroundTask(venueSearchTask, "scatter-venue-search-task");
+        startBackgroundTask(task, "scatter-venue-search-task");
     }
 
     @FXML
@@ -325,8 +290,8 @@ public class ScatterPlotsController {
         if (venue == null) {
             if (showMessages) {
                 showError(
-                        "Δεν επιλέχθηκε venue",
-                        "Πρέπει πρώτα να επιλέξεις ένα αποτέλεσμα από τη λίστα."
+                        "No venue selected",
+                        "You must select a result from the list first."
                 );
             }
 
@@ -337,7 +302,7 @@ public class ScatterPlotsController {
 
         if (venueType == null || venueType.isBlank()) {
             if (showMessages) {
-                showError("Δεν επιλέχθηκε τύπος", "Πρέπει πρώτα να επιλέξεις Journal ή Conference.");
+                showError("No venue type selected", "You must select Journal or Conference first.");
             }
 
             return;
@@ -346,8 +311,8 @@ public class ScatterPlotsController {
         if (scatterSelectedVenuesListView.getItems().size() >= MAX_SELECTED_VENUES) {
             if (showMessages) {
                 showError(
-                        "Πολλά venues",
-                        "Για να παραμένει ευανάγνωστο το scatter plot, μπορείς να επιλέξεις μέχρι "
+                        "Too many venues",
+                        "To keep the scatter plot readable, you can select up to "
                                 + MAX_SELECTED_VENUES + " venues."
                 );
             }
@@ -355,11 +320,21 @@ public class ScatterPlotsController {
             return;
         }
 
-        SelectedVenue selectedVenue = new SelectedVenue(venueType, venue);
+        ScatterPlotsService.SelectedVenue selectedVenue;
 
-        if (alreadySelected(selectedVenue)) {
+        try {
+            selectedVenue = scatterPlotsService.createSelectedVenue(venueType, venue);
+        } catch (IllegalArgumentException exception) {
             if (showMessages) {
-                showInfo("Ήδη επιλεγμένο", "Το συγκεκριμένο venue υπάρχει ήδη στη λίστα.");
+                showError("Invalid venue", exception.getMessage());
+            }
+
+            return;
+        }
+
+        if (scatterPlotsService.alreadySelected(scatterSelectedVenuesListView.getItems(), selectedVenue)) {
+            if (showMessages) {
+                showInfo("Already selected", "This venue already exists in the selected list.");
             }
 
             return;
@@ -380,7 +355,8 @@ public class ScatterPlotsController {
             return;
         }
 
-        SelectedVenue selected = scatterSelectedVenuesListView.getSelectionModel().getSelectedItem();
+        ScatterPlotsService.SelectedVenue selected =
+                scatterSelectedVenuesListView.getSelectionModel().getSelectedItem();
 
         if (selected != null) {
             scatterSelectedVenuesListView.getItems().remove(selected);
@@ -418,81 +394,28 @@ public class ScatterPlotsController {
     @FXML
     private void loadVenueScatter() {
         if (scatterSelectedVenuesListView == null || scatterSelectedVenuesListView.getItems().isEmpty()) {
-            showError("Δεν υπάρχουν επιλεγμένα venues", "Πρέπει να προσθέσεις τουλάχιστον ένα journal ή conference.");
+            showError("No selected venues", "You must add at least one journal or conference.");
             return;
         }
 
-        YearRange yearRange;
+        ScatterPlotsService.YearRange yearRange;
 
         try {
             yearRange = getSelectedYearRange();
         } catch (IllegalArgumentException exception) {
-            showError("Λάθος χρονιές", exception.getMessage());
+            showError("Invalid years", exception.getMessage());
             return;
         }
 
-        List<SelectedVenue> selectedVenues = new ArrayList<>(scatterSelectedVenuesListView.getItems());
+        List<ScatterPlotsService.SelectedVenue> selectedVenues =
+                new ArrayList<>(scatterSelectedVenuesListView.getItems());
 
-        Task<List<VenueScatterSeries>> task = new Task<>() {
+        final double scrollBeforeLoad = getPageScrollValue();
+
+        Task<List<ScatterPlotsService.VenueScatterSeries>> task = new Task<>() {
             @Override
-            protected List<VenueScatterSeries> call() {
-                List<VenueScatterSeries> chartSeries = new ArrayList<>();
-
-                for (SelectedVenue selectedVenue : selectedVenues) {
-                    if (TYPE_JOURNAL.equals(selectedVenue.type())) {
-                        int journalId = getJournalId(selectedVenue.venue());
-
-                        List<JournalYearlyStatsDto> stats =
-                                journalService.getJournalYearlyStats(
-                                        journalId,
-                                        yearRange.startYear(),
-                                        yearRange.endYear()
-                                );
-
-                        List<Object> yearlyStats = new ArrayList<>();
-
-                        if (stats != null) {
-                            yearlyStats.addAll(stats);
-                        }
-
-                        chartSeries.add(
-                                new VenueScatterSeries(
-                                        getVenueDisplayName(selectedVenue),
-                                        selectedVenue.type(),
-                                        journalId,
-                                        yearlyStats
-                                )
-                        );
-                    }
-
-                    if (TYPE_CONFERENCE.equals(selectedVenue.type())) {
-                        int conferenceId = getConferenceId(selectedVenue.venue());
-
-                        List<ConferenceYearlyStatsDto> stats =
-                                conferenceService.getConferenceYearlyStats(
-                                        conferenceId,
-                                        yearRange.startYear(),
-                                        yearRange.endYear()
-                                );
-
-                        List<Object> yearlyStats = new ArrayList<>();
-
-                        if (stats != null) {
-                            yearlyStats.addAll(stats);
-                        }
-
-                        chartSeries.add(
-                                new VenueScatterSeries(
-                                        getVenueDisplayName(selectedVenue),
-                                        selectedVenue.type(),
-                                        conferenceId,
-                                        yearlyStats
-                                )
-                        );
-                    }
-                }
-
-                return chartSeries;
+            protected List<ScatterPlotsService.VenueScatterSeries> call() {
+                return scatterPlotsService.loadVenueScatterSeries(selectedVenues, yearRange);
             }
         };
 
@@ -502,23 +425,26 @@ public class ScatterPlotsController {
         task.setOnSucceeded(event -> {
             setVenueLoading(false);
 
-            List<VenueScatterSeries> chartData = task.getValue();
+            List<ScatterPlotsService.VenueScatterSeries> chartData = task.getValue();
 
             if (chartData == null || chartData.isEmpty()) {
                 clearVenueScatterOnly();
                 setVenueStatus("No venue scatter data found.");
+                restorePageScrollValue(scrollBeforeLoad);
                 return;
             }
 
             updateVenueScatterChart(chartData);
             setVenueStatus("Loaded " + chartData.size() + " venue series.");
+            restorePageScrollValue(scrollBeforeLoad);
         });
 
         task.setOnFailed(event -> {
             setVenueLoading(false);
             Throwable exception = task.getException();
             setVenueStatus("Failed to load venue scatter plot.");
-            showError("Σφάλμα φόρτωσης scatter", exception == null ? null : exception.getMessage());
+            restorePageScrollValue(scrollBeforeLoad);
+            showError("Failed to load scatter plot", exception == null ? null : exception.getMessage());
         });
 
         startBackgroundTask(task, "scatter-venue-load-task");
@@ -528,38 +454,21 @@ public class ScatterPlotsController {
     private void loadRankingScatter() {
         String xMetric = rankingXMetricComboBox == null ? null : rankingXMetricComboBox.getValue();
         String yMetric = rankingYMetricComboBox == null ? null : rankingYMetricComboBox.getValue();
+        Integer requestedLimit = getSelectedRankingLimit();
 
-        if (xMetric == null || xMetric.isBlank()) {
-            showError("Δεν επιλέχθηκε X metric", "Πρέπει να επιλέξεις metric για τον X-axis.");
+        try {
+            scatterPlotsService.validateRankingMetrics(xMetric, yMetric);
+        } catch (IllegalArgumentException exception) {
+            showError("Invalid ranking metrics", exception.getMessage());
             return;
         }
 
-        if (yMetric == null || yMetric.isBlank()) {
-            showError("Δεν επιλέχθηκε Y metric", "Πρέπει να επιλέξεις metric για τον Y-axis.");
-            return;
-        }
-
-        if (xMetric.equals(yMetric)) {
-            showError("Ίδια metrics", "Διάλεξε διαφορετικό X metric και Y metric για να έχει νόημα το scatter plot.");
-            return;
-        }
-
-        Integer limit = rankingLimitComboBox == null ? DEFAULT_RANKING_LIMIT : rankingLimitComboBox.getValue();
-
-        if (limit == null || limit <= 0) {
-            limit = DEFAULT_RANKING_LIMIT;
-        }
-
-        String journalFilter = rankingJournalFilterField == null ? "" : rankingJournalFilterField.getText().trim();
-        Integer requestedLimit = limit;
-
-        Task<List<RankingScatterPoint>> task = new Task<>() {
+        Task<List<ScatterPlotsService.RankingScatterPoint>> task = new Task<>() {
             @Override
-            protected List<RankingScatterPoint> call() {
-                return loadJournalRankingScatterData(
+            protected List<ScatterPlotsService.RankingScatterPoint> call() {
+                return scatterPlotsService.loadJournalRankingScatterData(
                         xMetric,
                         yMetric,
-                        journalFilter,
                         requestedLimit
                 );
             }
@@ -571,27 +480,32 @@ public class ScatterPlotsController {
         task.setOnSucceeded(event -> {
             setRankingLoading(false);
 
-            List<RankingScatterPoint> points = task.getValue();
+            List<ScatterPlotsService.RankingScatterPoint> points = task.getValue();
 
             if (points == null || points.isEmpty()) {
                 clearRankingScatterOnly();
-                setRankingStatus("No ranking scatter data found. Check if the Service/DAO query has been connected.");
+                setRankingStatus("No ranking scatter data found.");
                 showInfo(
-                        "Δεν βρέθηκαν δεδομένα",
-                        "Το tab είναι έτοιμο, αλλά πρέπει να συνδεθεί με query στο JournalService/DAO για να επιστρέφει πραγματικά δεδομένα."
+                        "No data found",
+                        "No journals were found with values for both selected metrics."
                 );
                 return;
             }
 
             updateRankingScatterChart(points, xMetric, yMetric);
-            setRankingStatus("Loaded " + points.size() + " journal points.");
+
+            if (requestedLimit == null) {
+                setRankingStatus("Loaded all " + points.size() + " journal points.");
+            } else {
+                setRankingStatus("Loaded top " + points.size() + " journal points.");
+            }
         });
 
         task.setOnFailed(event -> {
             setRankingLoading(false);
             Throwable exception = task.getException();
             setRankingStatus("Failed to load ranking scatter.");
-            showError("Σφάλμα φόρτωσης ranking scatter", exception == null ? null : exception.getMessage());
+            showError("Failed to load ranking scatter", exception == null ? null : exception.getMessage());
         });
 
         startBackgroundTask(task, "ranking-scatter-load-task");
@@ -599,10 +513,6 @@ public class ScatterPlotsController {
 
     @FXML
     private void clearRankingScatter() {
-        if (rankingJournalFilterField != null) {
-            rankingJournalFilterField.clear();
-        }
-
         if (rankingXMetricComboBox != null) {
             rankingXMetricComboBox.getSelectionModel().select("Total Docs");
         }
@@ -612,11 +522,11 @@ public class ScatterPlotsController {
         }
 
         if (rankingLimitComboBox != null) {
-            rankingLimitComboBox.getSelectionModel().select(Integer.valueOf(DEFAULT_RANKING_LIMIT));
+            rankingLimitComboBox.getSelectionModel().select(String.valueOf(DEFAULT_RANKING_LIMIT));
         }
 
         clearRankingScatterOnly();
-        setRankingStatus("Choose ranking metrics and load journal ranking scatter.");
+        setRankingStatus("Choose ranking metrics and top N limit, then load journal ranking scatter.");
     }
 
     private void setupVenueTypeComboBox() {
@@ -624,8 +534,8 @@ public class ScatterPlotsController {
             return;
         }
 
-        scatterVenueTypeComboBox.getItems().setAll(TYPE_JOURNAL, TYPE_CONFERENCE);
-        scatterVenueTypeComboBox.getSelectionModel().select(TYPE_JOURNAL);
+        scatterVenueTypeComboBox.getItems().setAll(scatterPlotsService.getVenueTypes());
+        scatterVenueTypeComboBox.getSelectionModel().select(ScatterPlotsService.TYPE_JOURNAL);
 
         scatterVenueTypeComboBox.setOnAction(event -> {
             stopCurrentVenueSearch();
@@ -658,20 +568,7 @@ public class ScatterPlotsController {
         }
 
         comboBox.setEditable(false);
-        comboBox.getItems().setAll(buildYearList(MIN_YEAR));
-    }
-
-    private List<Integer> buildYearList(Integer minimumYear) {
-        int currentYear = LocalDate.now().getYear();
-        int min = minimumYear == null ? MIN_YEAR : minimumYear;
-
-        List<Integer> years = new ArrayList<>();
-
-        for (int year = currentYear; year >= min; year--) {
-            years.add(year);
-        }
-
-        return years;
+        comboBox.getItems().setAll(scatterPlotsService.buildYearList(MIN_YEAR));
     }
 
     private void refreshToYearOptions(Integer fromYear) {
@@ -681,7 +578,7 @@ public class ScatterPlotsController {
 
         Integer currentToYear = scatterToYearComboBox.getValue();
 
-        scatterToYearComboBox.getItems().setAll(buildYearList(fromYear));
+        scatterToYearComboBox.getItems().setAll(scatterPlotsService.buildYearList(fromYear));
 
         if (currentToYear != null && fromYear != null && currentToYear < fromYear) {
             scatterToYearComboBox.getSelectionModel().clearSelection();
@@ -726,7 +623,7 @@ public class ScatterPlotsController {
                     if (empty || venue == null) {
                         setText(null);
                     } else {
-                        setText(getRawVenueDisplayName(venue));
+                        setText(scatterPlotsService.getRawVenueDisplayName(venue));
                     }
                 }
             };
@@ -758,15 +655,15 @@ public class ScatterPlotsController {
         scatterSelectedVenuesListView.setPlaceholder(new Label("Selected venues will appear here."));
 
         scatterSelectedVenuesListView.setCellFactory(listView -> {
-            ListCell<SelectedVenue> cell = new ListCell<>() {
+            ListCell<ScatterPlotsService.SelectedVenue> cell = new ListCell<>() {
                 @Override
-                protected void updateItem(SelectedVenue selectedVenue, boolean empty) {
+                protected void updateItem(ScatterPlotsService.SelectedVenue selectedVenue, boolean empty) {
                     super.updateItem(selectedVenue, empty);
 
                     if (empty || selectedVenue == null) {
                         setText(null);
                     } else {
-                        setText(getVenueDisplayName(selectedVenue));
+                        setText(scatterPlotsService.getVenueDisplayName(selectedVenue));
                     }
                 }
             };
@@ -809,18 +706,18 @@ public class ScatterPlotsController {
 
     private void setupRankingControls() {
         if (rankingXMetricComboBox != null) {
-            rankingXMetricComboBox.getItems().setAll(RANKING_METRICS);
+            rankingXMetricComboBox.getItems().setAll(scatterPlotsService.getRankingMetrics());
             rankingXMetricComboBox.getSelectionModel().select("Total Docs");
         }
 
         if (rankingYMetricComboBox != null) {
-            rankingYMetricComboBox.getItems().setAll(RANKING_METRICS);
+            rankingYMetricComboBox.getItems().setAll(scatterPlotsService.getRankingMetrics());
             rankingYMetricComboBox.getSelectionModel().select("Cites / Doc 2y");
         }
 
         if (rankingLimitComboBox != null) {
-            rankingLimitComboBox.getItems().setAll(50, 100, 150, 200, 300, 500);
-            rankingLimitComboBox.getSelectionModel().select(Integer.valueOf(DEFAULT_RANKING_LIMIT));
+            rankingLimitComboBox.getItems().setAll("All", "50", "100", "150", "300", "500", "1000");
+            rankingLimitComboBox.getSelectionModel().select(String.valueOf(DEFAULT_RANKING_LIMIT));
         }
     }
 
@@ -893,113 +790,16 @@ public class ScatterPlotsController {
             searchDebounce.stop();
         }
 
+        stopCurrentVenueSearchTaskOnly();
+    }
+
+    private void stopCurrentVenueSearchTaskOnly() {
         if (venueSearchTask != null && venueSearchTask.isRunning()) {
             venueSearchTask.cancel();
         }
     }
 
-    private List<Object> sortVenueResultsByRelevance(List<Object> results, String query) {
-        if (results == null || results.isEmpty()) {
-            return new ArrayList<>();
-        }
-
-        String normalizedQuery = normalizeSearchText(query);
-        List<Object> sortedResults = new ArrayList<>(results);
-
-        sortedResults.sort((first, second) -> {
-            int firstScore = venueRelevanceScore(first, normalizedQuery);
-            int secondScore = venueRelevanceScore(second, normalizedQuery);
-
-            if (firstScore != secondScore) {
-                return Integer.compare(firstScore, secondScore);
-            }
-
-            String firstTitle = normalizeSearchText(getVenueTitleForSearch(first));
-            String secondTitle = normalizeSearchText(getVenueTitleForSearch(second));
-
-            if (firstTitle.length() != secondTitle.length()) {
-                return Integer.compare(firstTitle.length(), secondTitle.length());
-            }
-
-            return firstTitle.compareTo(secondTitle);
-        });
-
-        return sortedResults;
-    }
-
-    private int venueRelevanceScore(Object venue, String query) {
-        String title = normalizeSearchText(getVenueTitleForSearch(venue));
-        String acronym = normalizeSearchText(getVenueAcronymForSearch(venue));
-        String displayName = normalizeSearchText(getRawVenueDisplayName(venue));
-
-        if (title.equals(query) || acronym.equals(query) || displayName.equals(query)) {
-            return 0;
-        }
-
-        if (title.startsWith(query) || acronym.startsWith(query) || displayName.startsWith(query)) {
-            return 1;
-        }
-
-        if (title.contains(query) || acronym.contains(query) || displayName.contains(query)) {
-            return 2;
-        }
-
-        if (containsAllQueryWords(title + " " + acronym + " " + displayName, query)) {
-            return 3;
-        }
-
-        return 4;
-    }
-
-    private boolean containsAllQueryWords(String text, String query) {
-        if (query == null || query.isBlank()) {
-            return true;
-        }
-
-        for (String word : query.split(" ")) {
-            if (!word.isBlank() && !text.contains(word)) {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    private String getVenueTitleForSearch(Object venue) {
-        if (venue instanceof JournalSearchResultDto journal) {
-            return journal.journalName();
-        }
-
-        if (venue instanceof ConferenceSearchResultDto conference) {
-            return conference.conferenceTitle();
-        }
-
-        return "";
-    }
-
-    private String getVenueAcronymForSearch(Object venue) {
-        if (venue instanceof ConferenceSearchResultDto conference) {
-            return conference.acronym();
-        }
-
-        return "";
-    }
-
-    private String normalizeSearchText(String text) {
-        if (text == null) {
-            return "";
-        }
-
-        String normalized = Normalizer.normalize(text, Normalizer.Form.NFD)
-                .replaceAll("\\p{M}", "");
-
-        return normalized.toLowerCase(Locale.ROOT)
-                .trim()
-                .replaceAll("[^\\p{L}\\p{Nd}]+", " ")
-                .replaceAll("\\s+", " ");
-    }
-
-    private void updateVenueScatterChart(List<VenueScatterSeries> allSeries) {
+    private void updateVenueScatterChart(List<ScatterPlotsService.VenueScatterSeries> allSeries) {
         clearVenueScatterOnly();
 
         if (allSeries == null || allSeries.isEmpty()) {
@@ -1011,40 +811,16 @@ public class ScatterPlotsController {
         int seriesIndex = 0;
         int pointCount = 0;
 
-        for (VenueScatterSeries venueSeries : allSeries) {
+        for (ScatterPlotsService.VenueScatterSeries venueSeries : allSeries) {
             XYChart.Series<Number, Number> series = new XYChart.Series<>();
             series.setName(shortenName(venueSeries.name(), 45));
 
-            for (Object stat : venueSeries.yearlyStats()) {
-                Integer year = extractYear(stat);
-                Long articlesValue = extractMetricValue(stat, METRIC_ARTICLES);
-                Long authorEntriesValue = extractMetricValue(stat, METRIC_AUTHOR_ENTRIES);
-
-                if (year == null || articlesValue == null || authorEntriesValue == null) {
-                    continue;
-                }
-
-                if (articlesValue <= 0) {
-                    continue;
-                }
-
-                double articlesPerYear = articlesValue;
-                double avgAuthorsPerArticle = (double) authorEntriesValue / articlesValue;
-
-                maxArticlesPerYear = Math.max(maxArticlesPerYear, articlesPerYear);
-                maxAvgAuthorsPerArticle = Math.max(maxAvgAuthorsPerArticle, avgAuthorsPerArticle);
-
-                VenueScatterPoint point = new VenueScatterPoint(
-                        venueSeries.name(),
-                        venueSeries.type(),
-                        venueSeries.venueId(),
-                        year,
-                        articlesPerYear,
-                        avgAuthorsPerArticle
-                );
+            for (ScatterPlotsService.VenueScatterPoint point : venueSeries.points()) {
+                maxArticlesPerYear = Math.max(maxArticlesPerYear, point.articlesPerYear());
+                maxAvgAuthorsPerArticle = Math.max(maxAvgAuthorsPerArticle, point.avgAuthorsPerArticle());
 
                 XYChart.Data<Number, Number> dataPoint =
-                        new XYChart.Data<>(articlesPerYear, avgAuthorsPerArticle);
+                        new XYChart.Data<>(point.articlesPerYear(), point.avgAuthorsPerArticle());
 
                 dataPoint.setExtraValue(point);
                 series.getData().add(dataPoint);
@@ -1055,7 +831,7 @@ public class ScatterPlotsController {
                 venueScatterChart.getData().add(series);
 
                 final int colorIndex = seriesIndex;
-                final VenueScatterSeries currentVenueSeries = venueSeries;
+                final ScatterPlotsService.VenueScatterSeries currentVenueSeries = venueSeries;
                 runAfterChartRender(() -> applyVenueScatterColor(series, colorIndex, currentVenueSeries));
             }
 
@@ -1089,295 +865,11 @@ public class ScatterPlotsController {
         updateVenueLegend(null);
     }
 
-    private List<RankingScatterPoint> loadJournalRankingScatterData(
+    private void updateRankingScatterChart(
+            List<ScatterPlotsService.RankingScatterPoint> points,
             String xMetric,
-            String yMetric,
-            String journalFilter,
-            Integer limit
+            String yMetric
     ) {
-        List<Object> rawRows = invokeRankingServiceMethod(
-                List.of(
-                        "getJournalRankingScatterData",
-                        "getJournalRankingScatter",
-                        "getJournalRankingsForScatter",
-                        "getJournalRankingMetrics",
-                        "getJournalRankings"
-                ),
-                xMetric,
-                yMetric,
-                journalFilter,
-                limit
-        );
-
-        return convertRawRowsToRankingPoints(rawRows, xMetric, yMetric, journalFilter, limit);
-    }
-
-    private List<Object> invokeRankingServiceMethod(
-            List<String> methodNames,
-            String xMetric,
-            String yMetric,
-            String journalFilter,
-            Integer limit
-    ) {
-        if (methodNames == null || methodNames.isEmpty()) {
-            return new ArrayList<>();
-        }
-
-        for (String methodName : methodNames) {
-            List<Object> result;
-
-            result = tryInvokeServiceMethod(
-                    journalService,
-                    methodName,
-                    new Class<?>[]{String.class, String.class, String.class, Integer.class},
-                    new Object[]{xMetric, yMetric, journalFilter, limit}
-            );
-
-            if (result != null) {
-                return result;
-            }
-
-            result = tryInvokeServiceMethod(
-                    journalService,
-                    methodName,
-                    new Class<?>[]{String.class, String.class, String.class, int.class},
-                    new Object[]{xMetric, yMetric, journalFilter, limit == null ? DEFAULT_RANKING_LIMIT : limit}
-            );
-
-            if (result != null) {
-                return result;
-            }
-
-            result = tryInvokeServiceMethod(
-                    journalService,
-                    methodName,
-                    new Class<?>[]{String.class, String.class, Integer.class},
-                    new Object[]{xMetric, yMetric, limit}
-            );
-
-            if (result != null) {
-                return result;
-            }
-
-            result = tryInvokeServiceMethod(
-                    journalService,
-                    methodName,
-                    new Class<?>[]{String.class, String.class, int.class},
-                    new Object[]{xMetric, yMetric, limit == null ? DEFAULT_RANKING_LIMIT : limit}
-            );
-
-            if (result != null) {
-                return result;
-            }
-
-            result = tryInvokeServiceMethod(
-                    journalService,
-                    methodName,
-                    new Class<?>[]{String.class, Integer.class},
-                    new Object[]{journalFilter, limit}
-            );
-
-            if (result != null) {
-                return result;
-            }
-
-            result = tryInvokeServiceMethod(
-                    journalService,
-                    methodName,
-                    new Class<?>[]{String.class, int.class},
-                    new Object[]{journalFilter, limit == null ? DEFAULT_RANKING_LIMIT : limit}
-            );
-
-            if (result != null) {
-                return result;
-            }
-
-            result = tryInvokeServiceMethod(
-                    journalService,
-                    methodName,
-                    new Class<?>[]{Integer.class},
-                    new Object[]{limit}
-            );
-
-            if (result != null) {
-                return result;
-            }
-
-            result = tryInvokeServiceMethod(
-                    journalService,
-                    methodName,
-                    new Class<?>[]{int.class},
-                    new Object[]{limit == null ? DEFAULT_RANKING_LIMIT : limit}
-            );
-
-            if (result != null) {
-                return result;
-            }
-
-            result = tryInvokeServiceMethod(
-                    journalService,
-                    methodName,
-                    new Class<?>[]{},
-                    new Object[]{}
-            );
-
-            if (result != null) {
-                return result;
-            }
-        }
-
-        return new ArrayList<>();
-    }
-
-    @SuppressWarnings("unchecked")
-    private List<Object> tryInvokeServiceMethod(
-            Object service,
-            String methodName,
-            Class<?>[] parameterTypes,
-            Object[] arguments
-    ) {
-        try {
-            Method method = service.getClass().getMethod(methodName, parameterTypes);
-            Object result = method.invoke(service, arguments);
-
-            if (result instanceof List<?> list) {
-                return new ArrayList<>((List<Object>) list);
-            }
-
-            return new ArrayList<>();
-        } catch (NoSuchMethodException exception) {
-            return null;
-        } catch (Exception exception) {
-            throw new RuntimeException("Could not execute service method: " + methodName, exception);
-        }
-    }
-
-    private List<RankingScatterPoint> convertRawRowsToRankingPoints(
-            List<Object> rawRows,
-            String xMetric,
-            String yMetric,
-            String journalFilter,
-            Integer limit
-    ) {
-        if (rawRows == null || rawRows.isEmpty()) {
-            return new ArrayList<>();
-        }
-
-        List<RankingScatterPoint> points = new ArrayList<>();
-
-        for (Object row : rawRows) {
-            if (row == null) {
-                continue;
-            }
-
-            String journalName = readStringValue(
-                    row,
-                    List.of(
-                            "journalName",
-                            "journal_name",
-                            "journal",
-                            "title",
-                            "name",
-                            "label"
-                    )
-            );
-
-            Double xValue = readDoubleValue(
-                    row,
-                    metricValueNames(xMetric, true)
-            );
-
-            Double yValue = readDoubleValue(
-                    row,
-                    metricValueNames(yMetric, false)
-            );
-
-            if (journalName == null || journalName.isBlank()) {
-                journalName = "Unknown journal";
-            }
-
-            if (journalFilter != null
-                    && !journalFilter.isBlank()
-                    && !journalName.toLowerCase(Locale.ROOT).contains(journalFilter.toLowerCase(Locale.ROOT))) {
-                continue;
-            }
-
-            if (xValue == null || yValue == null) {
-                continue;
-            }
-
-            if (Double.isNaN(xValue) || Double.isInfinite(xValue)) {
-                continue;
-            }
-
-            if (Double.isNaN(yValue) || Double.isInfinite(yValue)) {
-                continue;
-            }
-
-            points.add(
-                    new RankingScatterPoint(
-                            journalName,
-                            xMetric,
-                            yMetric,
-                            xValue,
-                            yValue
-                    )
-            );
-        }
-
-        points.sort(
-                Comparator.comparingDouble((RankingScatterPoint point) -> point.xValue() + point.yValue())
-                        .reversed()
-        );
-
-        int safeLimit = limit == null || limit <= 0 ? DEFAULT_RANKING_LIMIT : limit;
-
-        if (points.size() > safeLimit) {
-            return new ArrayList<>(points.subList(0, safeLimit));
-        }
-
-        return points;
-    }
-
-    private List<String> metricValueNames(String metric, boolean xMetric) {
-        List<String> names = new ArrayList<>();
-
-        if (xMetric) {
-            names.add("xValue");
-            names.add("x_value");
-            names.add("x");
-        } else {
-            names.add("yValue");
-            names.add("y_value");
-            names.add("y");
-        }
-
-        if ("Total Docs".equals(metric)) {
-            names.addAll(List.of("totalDocs", "total_docs", "totalDocuments", "total_documents"));
-        } else if ("Total Docs 3y".equals(metric)) {
-            names.addAll(List.of("totalDocs3y", "total_docs_3y", "totalDocuments3y", "total_documents_3y"));
-        } else if ("Total Refs".equals(metric)) {
-            names.addAll(List.of("totalRefs", "total_refs", "totalReferences", "total_references"));
-        } else if ("Total Cites 3y".equals(metric)) {
-            names.addAll(List.of("totalCites3y", "total_cites_3y", "totalCitations3y", "total_citations_3y"));
-        } else if ("Citable Docs 3y".equals(metric)) {
-            names.addAll(List.of("citableDocs3y", "citable_docs_3y", "citableDocuments3y", "citable_documents_3y"));
-        } else if ("Cites / Doc 2y".equals(metric)) {
-            names.addAll(List.of("citesDoc2y", "cites_doc_2y", "citesPerDoc2y", "cites_per_doc_2y", "citesPerDocument2y"));
-        } else if ("Refs / Doc".equals(metric)) {
-            names.addAll(List.of("refsDoc", "refs_doc", "refsPerDoc", "refs_per_doc", "refsPerDocument"));
-        } else if ("SJR".equals(metric)) {
-            names.addAll(List.of("sjr", "sjrIndex", "sjr_index"));
-        } else if ("Cite Score".equals(metric)) {
-            names.addAll(List.of("citeScore", "cite_score", "citescore"));
-        } else if ("H index".equals(metric)) {
-            names.addAll(List.of("hIndex", "h_index", "hindex"));
-        }
-
-        return names;
-    }
-
-    private void updateRankingScatterChart(List<RankingScatterPoint> points, String xMetric, String yMetric) {
         clearRankingScatterOnly();
 
         if (points == null || points.isEmpty() || journalRankingScatterChart == null) {
@@ -1390,7 +882,7 @@ public class ScatterPlotsController {
         double maxX = 0;
         double maxY = 0;
 
-        for (RankingScatterPoint point : points) {
+        for (ScatterPlotsService.RankingScatterPoint point : points) {
             maxX = Math.max(maxX, point.xValue());
             maxY = Math.max(maxY, point.yValue());
 
@@ -1456,7 +948,7 @@ public class ScatterPlotsController {
 
             Object extraValue = data.getExtraValue();
 
-            if (extraValue instanceof RankingScatterPoint point) {
+            if (extraValue instanceof ScatterPlotsService.RankingScatterPoint point) {
                 Tooltip.install(
                         node,
                         new Tooltip(
@@ -1483,14 +975,14 @@ public class ScatterPlotsController {
     private void applyVenueScatterColor(
             XYChart.Series<Number, Number> series,
             int colorIndex,
-            VenueScatterSeries venueSeries
+            ScatterPlotsService.VenueScatterSeries venueSeries
     ) {
         if (series == null || venueSeries == null) {
             return;
         }
 
         String color = getChartColor(colorIndex);
-        String venueKey = getVenueKey(venueSeries);
+        String venueKey = scatterPlotsService.getVenueKey(venueSeries);
 
         Runnable normalStyle = () -> {
             for (XYChart.Data<Number, Number> data : series.getData()) {
@@ -1501,7 +993,7 @@ public class ScatterPlotsController {
 
                     Object extraValue = data.getExtraValue();
 
-                    if (extraValue instanceof VenueScatterPoint point) {
+                    if (extraValue instanceof ScatterPlotsService.VenueScatterPoint point) {
                         Tooltip.install(
                                 scatterNode,
                                 new Tooltip(
@@ -1593,7 +1085,7 @@ public class ScatterPlotsController {
         }
     }
 
-    private void updateVenueLegend(List<VenueScatterSeries> allSeries) {
+    private void updateVenueLegend(List<ScatterPlotsService.VenueScatterSeries> allSeries) {
         legendHighlightHandles.clear();
 
         if (venueScatterLegendBox == null || venueScatterLegendFlow == null) {
@@ -1610,9 +1102,9 @@ public class ScatterPlotsController {
 
         int index = 0;
 
-        for (VenueScatterSeries venueSeries : allSeries) {
+        for (ScatterPlotsService.VenueScatterSeries venueSeries : allSeries) {
             String color = getChartColor(index);
-            String venueKey = getVenueKey(venueSeries);
+            String venueKey = scatterPlotsService.getVenueKey(venueSeries);
 
             Region colorDot = new Region();
             colorDot.setMinSize(10, 10);
@@ -1633,6 +1125,15 @@ public class ScatterPlotsController {
             legendItem.setOnMouseEntered(event -> setActiveVenueHighlight(venueKey));
             legendItem.setOnMouseExited(event -> setActiveVenueHighlight(null));
 
+            legendItem.setOnMouseClicked(event -> {
+                if (event.getButton() == MouseButton.PRIMARY
+                        && event.getClickCount() == 2) {
+
+                    removeVenueFromLegendAndReload(venueSeries);
+                    event.consume();
+                }
+            });
+
             LegendHighlightHandle handle = new LegendHighlightHandle(
                     venueKey,
                     legendItem,
@@ -1651,6 +1152,29 @@ public class ScatterPlotsController {
         venueScatterLegendBox.setManaged(true);
 
         applyActiveVenueHighlight();
+    }
+
+    private void removeVenueFromLegendAndReload(ScatterPlotsService.VenueScatterSeries venueSeries) {
+        if (venueSeries == null || scatterSelectedVenuesListView == null) {
+            return;
+        }
+
+        boolean removed = scatterSelectedVenuesListView.getItems().removeIf(selectedVenue ->
+                selectedVenue.type().equals(venueSeries.type())
+                        && scatterPlotsService.getVenueId(selectedVenue.venue()) == venueSeries.venueId()
+        );
+
+        if (!removed) {
+            return;
+        }
+
+        if (scatterSelectedVenuesListView.getItems().isEmpty()) {
+            clearVenueScatterOnly();
+            setVenueStatus("No selected venues. Add journals/conferences and load venue scatter.");
+            return;
+        }
+
+        loadVenueScatter();
     }
 
     private void applyLegendStyle(LegendHighlightHandle handle, boolean highlighted) {
@@ -1801,15 +1325,16 @@ public class ScatterPlotsController {
         return CHART_COLORS[index % CHART_COLORS.length];
     }
 
-    private YearRange getSelectedYearRange() {
+    private ScatterPlotsService.YearRange getSelectedYearRange() {
         Integer startYear = scatterFromYearComboBox == null ? null : scatterFromYearComboBox.getValue();
         Integer endYear = scatterToYearComboBox == null ? null : scatterToYearComboBox.getValue();
 
-        if (startYear != null && endYear != null && endYear < startYear) {
-            throw new IllegalArgumentException("Το To year πρέπει να είναι μεγαλύτερο ή ίσο από το From year.");
-        }
+        return scatterPlotsService.validateYearRange(startYear, endYear);
+    }
 
-        return new YearRange(startYear, endYear);
+    private Integer getSelectedRankingLimit() {
+        String selectedLimit = rankingLimitComboBox == null ? null : rankingLimitComboBox.getValue();
+        return scatterPlotsService.resolveRankingLimit(selectedLimit, DEFAULT_RANKING_LIMIT);
     }
 
     private String getSelectedVenueType() {
@@ -1818,129 +1343,6 @@ public class ScatterPlotsController {
         }
 
         return scatterVenueTypeComboBox.getValue();
-    }
-
-    private boolean alreadySelected(SelectedVenue newSelectedVenue) {
-        if (scatterSelectedVenuesListView == null) {
-            return false;
-        }
-
-        for (SelectedVenue existing : scatterSelectedVenuesListView.getItems()) {
-            if (existing.type().equals(newSelectedVenue.type())
-                    && getVenueId(existing.venue()) == getVenueId(newSelectedVenue.venue())) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private int getVenueId(Object venue) {
-        if (venue instanceof JournalSearchResultDto journal) {
-            return journal.journalId() == null ? -1 : journal.journalId();
-        }
-
-        if (venue instanceof ConferenceSearchResultDto conference) {
-            return conference.conferenceId() == null ? -1 : conference.conferenceId();
-        }
-
-        return -1;
-    }
-
-    private int getJournalId(Object venue) {
-        if (venue instanceof JournalSearchResultDto journal) {
-            if (journal.journalId() != null && journal.journalId() > 0) {
-                return journal.journalId();
-            }
-        }
-
-        throw new IllegalArgumentException("Δεν βρέθηκε έγκυρο journalId.");
-    }
-
-    private int getConferenceId(Object venue) {
-        if (venue instanceof ConferenceSearchResultDto conference) {
-            if (conference.conferenceId() != null && conference.conferenceId() > 0) {
-                return conference.conferenceId();
-            }
-        }
-
-        throw new IllegalArgumentException("Δεν βρέθηκε έγκυρο conferenceId.");
-    }
-
-    private String getVenueDisplayName(SelectedVenue selectedVenue) {
-        return selectedVenue.type() + ": " + getRawVenueDisplayName(selectedVenue.venue());
-    }
-
-    private String getRawVenueDisplayName(Object venue) {
-        if (venue instanceof JournalSearchResultDto journal) {
-            if (journal.journalName() != null && !journal.journalName().isBlank()) {
-                return journal.journalName();
-            }
-
-            return "Journal #" + journal.journalId();
-        }
-
-        if (venue instanceof ConferenceSearchResultDto conference) {
-            if (conference.acronym() != null && !conference.acronym().isBlank()) {
-                if (conference.conferenceTitle() != null && !conference.conferenceTitle().isBlank()) {
-                    return conference.acronym() + " - " + conference.conferenceTitle();
-                }
-
-                return conference.acronym();
-            }
-
-            if (conference.conferenceTitle() != null && !conference.conferenceTitle().isBlank()) {
-                return conference.conferenceTitle();
-            }
-
-            return "Conference #" + conference.conferenceId();
-        }
-
-        return "Unknown venue";
-    }
-
-    private Integer extractYear(Object stat) {
-        if (stat instanceof JournalYearlyStatsDto journalStat) {
-            return journalStat.year();
-        }
-
-        if (stat instanceof ConferenceYearlyStatsDto conferenceStat) {
-            return conferenceStat.year();
-        }
-
-        return null;
-    }
-
-    private Long extractMetricValue(Object stat, String metric) {
-        if (stat instanceof JournalYearlyStatsDto journalStat) {
-            if (METRIC_ARTICLES.equals(metric)) {
-                return journalStat.totalArticles();
-            }
-
-            if (METRIC_AUTHOR_ENTRIES.equals(metric)) {
-                return journalStat.totalAuthorOccurrences();
-            }
-        }
-
-        if (stat instanceof ConferenceYearlyStatsDto conferenceStat) {
-            if (METRIC_ARTICLES.equals(metric)) {
-                return conferenceStat.totalArticles();
-            }
-
-            if (METRIC_AUTHOR_ENTRIES.equals(metric)) {
-                return conferenceStat.totalAuthorOccurrences();
-            }
-        }
-
-        return null;
-    }
-
-    private String getVenueKey(VenueScatterSeries venueSeries) {
-        if (venueSeries == null) {
-            return "";
-        }
-
-        return venueSeries.type() + "#" + venueSeries.venueId();
     }
 
     private String shortenName(String name, int maxLength) {
@@ -1963,83 +1365,23 @@ public class ScatterPlotsController {
         return String.format(Locale.US, "%.2f", value);
     }
 
-    private String readStringValue(Object row, List<String> names) {
-        Object value = readValue(row, names);
-
-        if (value == null) {
-            return null;
+    private double getPageScrollValue() {
+        if (scatterPageScrollPane == null) {
+            return 0;
         }
 
-        return String.valueOf(value).trim();
+        return scatterPageScrollPane.getVvalue();
     }
 
-    private Double readDoubleValue(Object row, List<String> names) {
-        Object value = readValue(row, names);
-
-        if (value == null) {
-            return null;
+    private void restorePageScrollValue(double value) {
+        if (scatterPageScrollPane == null) {
+            return;
         }
 
-        if (value instanceof Number number) {
-            return number.doubleValue();
-        }
-
-        try {
-            return Double.parseDouble(String.valueOf(value).trim().replace(",", "."));
-        } catch (NumberFormatException exception) {
-            return null;
-        }
-    }
-
-    private Object readValue(Object row, List<String> names) {
-        for (String name : names) {
-            Object value = tryReadMethod(row, name);
-
-            if (value != null) {
-                return value;
-            }
-
-            value = tryReadMethod(row, "get" + capitalize(name));
-
-            if (value != null) {
-                return value;
-            }
-
-            value = tryReadField(row, name);
-
-            if (value != null) {
-                return value;
-            }
-        }
-
-        return null;
-    }
-
-    private Object tryReadMethod(Object row, String methodName) {
-        try {
-            Method method = row.getClass().getMethod(methodName);
-            return method.invoke(row);
-        } catch (Exception exception) {
-            return null;
-        }
-    }
-
-    private Object tryReadField(Object row, String fieldName) {
-        try {
-            Field field = row.getClass().getDeclaredField(fieldName);
-            field.setAccessible(true);
-            return field.get(row);
-        } catch (Exception exception) {
-            return null;
-        }
-    }
-
-    private String capitalize(String text) {
-        if (text == null || text.isBlank()) {
-            return "";
-        }
-
-        return text.substring(0, 1).toUpperCase() + text.substring(1);
+        Platform.runLater(() -> {
+            scatterPageScrollPane.setVvalue(value);
+            Platform.runLater(() -> scatterPageScrollPane.setVvalue(value));
+        });
     }
 
     private void setVenueLoading(boolean loading) {
@@ -2101,10 +1443,6 @@ public class ScatterPlotsController {
             rankingLimitComboBox.setDisable(loading);
         }
 
-        if (rankingJournalFilterField != null) {
-            rankingJournalFilterField.setDisable(loading);
-        }
-
         if (loadRankingScatterButton != null) {
             loadRankingScatterButton.setDisable(loading);
         }
@@ -2144,7 +1482,7 @@ public class ScatterPlotsController {
         Alert alert = new Alert(Alert.AlertType.ERROR);
         alert.setTitle(title);
         alert.setHeaderText(title);
-        alert.setContentText(message == null || message.isBlank() ? "Άγνωστο σφάλμα." : message);
+        alert.setContentText(message == null || message.isBlank() ? "Unknown error." : message);
         alert.showAndWait();
     }
 
@@ -2154,45 +1492,6 @@ public class ScatterPlotsController {
         alert.setHeaderText(title);
         alert.setContentText(message == null || message.isBlank() ? "-" : message);
         alert.showAndWait();
-    }
-
-    private record SelectedVenue(
-            String type,
-            Object venue
-    ) {
-    }
-
-    private record YearRange(
-            Integer startYear,
-            Integer endYear
-    ) {
-    }
-
-    private record VenueScatterSeries(
-            String name,
-            String type,
-            int venueId,
-            List<Object> yearlyStats
-    ) {
-    }
-
-    private record VenueScatterPoint(
-            String venueName,
-            String venueType,
-            int venueId,
-            int year,
-            double articlesPerYear,
-            double avgAuthorsPerArticle
-    ) {
-    }
-
-    private record RankingScatterPoint(
-            String journalName,
-            String xMetric,
-            String yMetric,
-            double xValue,
-            double yValue
-    ) {
     }
 
     private record ChartHighlightHandle(

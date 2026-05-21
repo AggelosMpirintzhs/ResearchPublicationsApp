@@ -12,15 +12,17 @@ public final class SqlFileLoader {
 
     private static final Map<String, String> CACHE = new ConcurrentHashMap<>();
 
+    // Prevents object creation
     private SqlFileLoader() {
-        // Utility class. Δεν θέλουμε instances.
     }
 
+    // Loads SQL file
     public static String load(String path) {
         String normalizedPath = normalizePath(path);
         return CACHE.computeIfAbsent(normalizedPath, SqlFileLoader::readSqlFile);
     }
 
+    // Reads SQL content
     private static String readSqlFile(String normalizedPath) {
         InputStream inputStream = SqlFileLoader.class
                 .getClassLoader()
@@ -28,7 +30,7 @@ public final class SqlFileLoader {
 
         if (inputStream == null) {
             throw new IllegalArgumentException(
-                    "Δεν βρέθηκε το SQL αρχείο στα resources: " + normalizedPath
+                    "SQL file not found in resources: " + normalizedPath
             );
         }
 
@@ -41,20 +43,22 @@ public final class SqlFileLoader {
                     .collect(Collectors.joining(System.lineSeparator()));
         } catch (Exception exception) {
             throw new RuntimeException(
-                    "Αποτυχία φόρτωσης SQL αρχείου: " + normalizedPath,
+                    "Failed to load SQL file: " + normalizedPath,
                     exception
             );
         }
     }
 
+    // Normalizes file path
     private static String normalizePath(String path) {
         if (path == null || path.isBlank()) {
-            throw new IllegalArgumentException("Το path του SQL αρχείου δεν μπορεί να είναι κενό.");
+            throw new IllegalArgumentException("SQL file path cannot be empty.");
         }
 
         return path.startsWith("/") ? path.substring(1) : path;
     }
 
+    // Clears SQL cache
     public static void clearCache() {
         CACHE.clear();
     }

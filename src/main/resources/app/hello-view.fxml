@@ -15,18 +15,24 @@
 <BorderPane xmlns="http://javafx.com/javafx"
             xmlns:fx="http://javafx.com/fxml"
             fx:controller="app.HelloController"
-            styleClass="root-pane">
+            styleClass="landing-root">
 
   <!-- ================= TOP BAR ================= -->
   <top>
-    <HBox alignment="CENTER_LEFT" spacing="14" styleClass="top-bar">
+    <HBox alignment="CENTER_LEFT" spacing="16" styleClass="landing-top-bar">
+
       <VBox spacing="2">
         <Label text="Research Publications App"
-               styleClass="app-title"/>
+               styleClass="landing-app-title"/>
 
         <Label text="Bibliographic data analysis system"
-               styleClass="app-subtitle"/>
+               styleClass="landing-app-subtitle"/>
       </VBox>
+
+      <Region HBox.hgrow="ALWAYS"/>
+
+      <Label text="Research Analytics"
+             styleClass="landing-top-badge"/>
     </HBox>
   </top>
 
@@ -35,46 +41,49 @@
     <ScrollPane fitToWidth="true"
                 hbarPolicy="NEVER"
                 pannable="true"
-                styleClass="page-scroll">
+                styleClass="landing-scroll">
 
       <content>
-        <StackPane alignment="TOP_CENTER">
+        <StackPane alignment="TOP_CENTER" styleClass="landing-background">
           <padding>
-            <Insets top="34" right="44" bottom="44" left="44"/>
+            <Insets top="30" right="42" bottom="42" left="42"/>
           </padding>
 
-          <VBox spacing="26"
-                maxWidth="1500"
-                alignment="TOP_CENTER">
+          <VBox spacing="24"
+                alignment="TOP_CENTER"
+                maxWidth="1360">
 
-            <!-- ================= INTRO DESCRIPTION ================= -->
-            <VBox spacing="10"
-                  maxWidth="1500"
+            <!-- ================= HERO ================= -->
+            <VBox spacing="8"
                   alignment="CENTER_LEFT"
-                  styleClass="simple-home-hero">
+                  maxWidth="1360"
+                  styleClass="landing-hero">
 
-              <Label text="This application provides an interactive environment for exploring integrated bibliographic data from journals, conferences, publication years and authors. Through ready-made reports, profiles and visual analytics, users can discover publication activity, rankings, yearly trends and hidden patterns inside the data."
+              <Label text="Explore Research Publications"
                      wrapText="true"
-                     maxWidth="960"
-                     styleClass="home-main-description"/>
+                     styleClass="landing-hero-title"/>
 
+              <Label text="Search journals, conferences, authors and publication years. Explore profiles, rankings, trends and visual analytics through a clean and intuitive desktop experience."
+                     wrapText="true"
+                     maxWidth="980"
+                     styleClass="landing-hero-description"/>
             </VBox>
 
             <!-- ================= SECTION TITLE ================= -->
-            <HBox alignment="CENTER_LEFT" maxWidth="1080">
-              <VBox spacing="3">
-                <Label text="Main sections"
-                       styleClass="simple-section-title"/>
+            <HBox alignment="CENTER_LEFT" maxWidth="1360">
+              <VBox spacing="4">
+                <Label text="What can you explore?"
+                       styleClass="landing-section-title"/>
 
-                <Label text="Choose a section to start exploring the database."
-                       styleClass="simple-section-subtitle"/>
+                <Label text="Choose the section that matches the analysis you want to perform."
+                       styleClass="landing-section-subtitle"/>
               </VBox>
             </HBox>
 
             <!-- ================= CARDS ================= -->
             <GridPane hgap="20"
                       vgap="20"
-                      maxWidth="1500"
+                      maxWidth="1360"
                       alignment="CENTER">
 
               <columnConstraints>
@@ -83,83 +92,131 @@
               </columnConstraints>
 
               <!-- Journals / Conferences -->
-              <VBox spacing="12"
-                    styleClass="simple-home-card"
+              <VBox spacing="16"
+                    styleClass="landing-card"
                     GridPane.columnIndex="0"
                     GridPane.rowIndex="0">
 
-                <Label text="Journals / Conferences"
-                       styleClass="simple-card-title"/>
+                <HBox spacing="14" alignment="CENTER_LEFT">
+                  <StackPane styleClass="landing-card-icon">
+                    <Label text="📰" styleClass="landing-card-icon-text"/>
+                  </StackPane>
 
-                <Label text="View venue profiles, rankings, yearly statistics, publication counts and visual reports."
+                  <VBox spacing="3">
+                    <Label text="Journals / Conferences"
+                           styleClass="landing-card-title"/>
+
+                    <Label text="Profiles, rankings and yearly activity"
+                           styleClass="landing-card-subtitle"/>
+                  </VBox>
+                </HBox>
+
+                <Label text="Inspect a journal or conference profile, view ranking information, yearly publication trends and optional article reports."
                        wrapText="true"
-                       styleClass="simple-card-text"/>
+                       styleClass="landing-card-description"/>
 
                 <Region VBox.vgrow="ALWAYS"/>
 
-                <Button text="Open Section"
+                <Button text="Open Venues"
                         onAction="#openVenuePage"
-                        styleClass="simple-card-button"/>
+                        maxWidth="Infinity"
+                        styleClass="landing-card-button"/>
               </VBox>
 
               <!-- Years -->
-              <VBox spacing="12"
-                    styleClass="simple-home-card"
+              <VBox spacing="16"
+                    styleClass="landing-card"
                     GridPane.columnIndex="1"
                     GridPane.rowIndex="0">
 
-                <Label text="Years"
-                       styleClass="simple-card-title"/>
+                <HBox spacing="14" alignment="CENTER_LEFT">
+                  <StackPane styleClass="landing-card-icon">
+                    <Label text="📅" styleClass="landing-card-icon-text"/>
+                  </StackPane>
 
-                <Label text="Analyze each publication year with total articles, journals, conferences and distinct authors."
+                  <VBox spacing="3">
+                    <Label text="Years"
+                           styleClass="landing-card-title"/>
+
+                    <Label text="Publication activity by year"
+                           styleClass="landing-card-subtitle"/>
+                  </VBox>
+                </HBox>
+
+                <Label text="Analyze a selected year and see article counts, journals, conferences, total authors and distinct authors."
                        wrapText="true"
-                       styleClass="simple-card-text"/>
+                       styleClass="landing-card-description"/>
 
                 <Region VBox.vgrow="ALWAYS"/>
 
-                <Button text="Open Section"
+                <Button text="Open Years"
                         onAction="#openYearsPage"
-                        styleClass="simple-card-button"/>
+                        maxWidth="Infinity"
+                        styleClass="landing-card-button"/>
               </VBox>
 
               <!-- Authors -->
-              <VBox spacing="12"
-                    styleClass="simple-home-card"
+              <VBox spacing="16"
+                    styleClass="landing-card"
                     GridPane.columnIndex="0"
                     GridPane.rowIndex="1">
 
-                <Label text="Authors"
-                       styleClass="simple-card-title"/>
+                <HBox spacing="14" alignment="CENTER_LEFT">
+                  <StackPane styleClass="landing-card-icon">
+                    <Label text="🖋" styleClass="landing-card-icon-text"/>
+                  </StackPane>
 
-                <Label text="Explore author profiles, publication activity, first and last publication year and productivity statistics."
+                  <VBox spacing="3">
+                    <Label text="Authors"
+                           styleClass="landing-card-title"/>
+
+                    <Label text="Researcher profiles and productivity"
+                           styleClass="landing-card-subtitle"/>
+                  </VBox>
+                </HBox>
+
+                <Label text="Search authors and inspect publication history, productivity statistics, first and last publication year."
                        wrapText="true"
-                       styleClass="simple-card-text"/>
+                       styleClass="landing-card-description"/>
 
                 <Region VBox.vgrow="ALWAYS"/>
 
-                <Button text="Open Section"
+                <Button text="Open Authors"
                         onAction="#openAuthorPage"
-                        styleClass="simple-card-button"/>
+                        maxWidth="Infinity"
+                        styleClass="landing-card-button"/>
               </VBox>
 
               <!-- Visual Analytics -->
-              <VBox spacing="12"
-                    styleClass="simple-home-card"
+              <VBox spacing="16"
+                    styleClass="landing-card"
                     GridPane.columnIndex="1"
                     GridPane.rowIndex="1">
 
-                <Label text="Visual Analytics"
-                       styleClass="simple-card-title"/>
+                <HBox spacing="14" alignment="CENTER_LEFT">
+                  <StackPane styleClass="landing-card-icon">
+                    <Label text="📊" styleClass="landing-card-icon-text"/>
+                  </StackPane>
 
-                <Label text="Compare journals and conferences through targeted line charts, yearly trends and publication metrics."
+                  <VBox spacing="3">
+                    <Label text="Visual Analytics"
+                           styleClass="landing-card-title"/>
+
+                    <Label text="Charts, comparisons and insights"
+                           styleClass="landing-card-subtitle"/>
+                  </VBox>
+                </HBox>
+
+                <Label text="Compare publication activity through targeted visualizations and identify trends across venues, authors and years."
                        wrapText="true"
-                       styleClass="simple-card-text"/>
+                       styleClass="landing-card-description"/>
 
                 <Region VBox.vgrow="ALWAYS"/>
 
-                <Button text="Open Section"
+                <Button text="Open Analytics"
                         onAction="#openChartsPage"
-                        styleClass="simple-card-button"/>
+                        maxWidth="Infinity"
+                        styleClass="landing-card-button"/>
               </VBox>
 
             </GridPane>

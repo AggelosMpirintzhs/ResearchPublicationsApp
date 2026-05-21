@@ -12,10 +12,11 @@ public class DatabaseManager {
 
     private static DataSource dataSource;
 
+    // Prevents object creation
     private DatabaseManager() {
-        // Utility class. Δεν θέλουμε instances.
     }
 
+    // Initializes database source
     public static void initialize() {
         AppConfig appConfig = new AppConfig();
         DatabaseConfig databaseConfig = DatabaseConfig.from(appConfig);
@@ -25,47 +26,51 @@ public class DatabaseManager {
         testConnection();
     }
 
+    // Gets data source
     public static DataSource getDataSource() {
         if (dataSource == null) {
             throw new DatabaseConnectionException(
-                    "Το DataSource δεν έχει αρχικοποιηθεί. Κάλεσε πρώτα DatabaseManager.initialize()."
+                    "DataSource has not been initialized. Call DatabaseManager.initialize() first."
             );
         }
 
         return dataSource;
     }
 
+    // Gets database connection
     public static Connection getConnection() {
         try {
             return getDataSource().getConnection();
         } catch (SQLException exception) {
             throw new DatabaseConnectionException(
-                    "Αποτυχία λήψης σύνδεσης από τη βάση.",
+                    "Failed to get database connection.",
                     exception
             );
         }
     }
 
+    // Tests database connection
     public static void testConnection() {
         try (Connection connection = getConnection()) {
             if (!connection.isValid(5)) {
-                throw new DatabaseConnectionException("Η σύνδεση με τη βάση δεν είναι έγκυρη.");
+                throw new DatabaseConnectionException("Database connection is not valid.");
             }
 
-            System.out.println("Επιτυχής σύνδεση με τη βάση δεδομένων.");
+            System.out.println("Database connection successful.");
 
         } catch (SQLException exception) {
             throw new DatabaseConnectionException(
-                    "Αποτυχία ελέγχου σύνδεσης με τη βάση.",
+                    "Failed to test database connection.",
                     exception
             );
         }
     }
 
+    // Closes database pool
     public static void shutdown() {
         if (dataSource instanceof HikariDataSource hikariDataSource) {
             hikariDataSource.close();
-            System.out.println("Το database connection pool έκλεισε.");
+            System.out.println("Database connection pool closed.");
         }
     }
 }

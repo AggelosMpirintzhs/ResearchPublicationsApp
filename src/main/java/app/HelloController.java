@@ -17,26 +17,31 @@ public class HelloController {
     private static final String AUTHOR_FXML_PATH = "/app/author-view.fxml";
     private static final String CHARTS_FXML_PATH = "/app/charts-view.fxml";
 
+    // Opens venue page
     @FXML
     private void openVenuePage(ActionEvent event) {
         switchPage(event, VENUE_FXML_PATH);
     }
 
+    // Opens years page
     @FXML
     private void openYearsPage(ActionEvent event) {
         switchPage(event, YEAR_FXML_PATH);
     }
 
+    // Opens author page
     @FXML
     private void openAuthorPage(ActionEvent event) {
         switchPage(event, AUTHOR_FXML_PATH);
     }
 
+    // Opens charts page
     @FXML
     private void openChartsPage(ActionEvent event) {
         switchPage(event, CHARTS_FXML_PATH);
     }
 
+    // Switches current page
     private void switchPage(ActionEvent event, String fxmlPath) {
         try {
             URL fxmlUrl = Objects.requireNonNull(

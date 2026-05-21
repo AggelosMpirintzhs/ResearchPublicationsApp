@@ -1,12 +1,14 @@
 package service;
 
+import dto.chart.CategoryOptionDto;
+import dto.chart.CategoryTrendDto;
 import dto.conference.ConferenceArticleDto;
 import dto.conference.ConferenceProfileDto;
 import dto.conference.ConferenceRankingDto;
 import dto.conference.ConferenceSearchResultDto;
 import dto.conference.ConferenceYearlyStatsDto;
 import repository.ConferenceRepository;
-import dto.chart.CategoryOptionDto;
+
 import java.util.List;
 import java.util.Optional;
 
@@ -24,17 +26,38 @@ public class ConferenceService {
 
     private final ConferenceRepository conferenceRepository;
 
+    // Creates conference service
     public ConferenceService() {
         this.conferenceRepository = new ConferenceRepository();
     }
 
+    // Creates conference service
     public ConferenceService(ConferenceRepository conferenceRepository) {
         this.conferenceRepository = conferenceRepository;
     }
+
+    // Gets FoR categories
     public List<CategoryOptionDto> getPrimaryFoRCategories() {
         return conferenceRepository.findPrimaryFoRCategories();
     }
 
+    // Gets yearly trends
+    public List<CategoryTrendDto> getConferencePrimaryFoRYearlyTrends(
+            String categoryFilter,
+            Integer startYear,
+            Integer endYear
+    ) {
+        YearRange yearRange = normalizeYearRange(startYear, endYear);
+        String normalizedCategoryFilter = normalizeCategoryFilter(categoryFilter);
+
+        return conferenceRepository.findConferencePrimaryFoRYearlyTrends(
+                normalizedCategoryFilter,
+                yearRange.startYear(),
+                yearRange.endYear()
+        );
+    }
+
+    // Searches conferences
     public List<ConferenceSearchResultDto> searchConferences(String searchText, Integer limit) {
         String normalizedSearchText = normalizeSearchText(searchText);
 
@@ -47,6 +70,7 @@ public class ConferenceService {
         return conferenceRepository.searchConferences(normalizedSearchText, safeLimit);
     }
 
+    // Gets conference profile
     public Optional<ConferenceProfileDto> getConferenceProfile(
             int conferenceId,
             Integer startYear,
@@ -63,6 +87,7 @@ public class ConferenceService {
         );
     }
 
+    // Gets yearly stats
     public List<ConferenceYearlyStatsDto> getConferenceYearlyStats(
             int conferenceId,
             Integer startYear,
@@ -79,12 +104,14 @@ public class ConferenceService {
         );
     }
 
+    // Gets conference ranking
     public Optional<ConferenceRankingDto> getConferenceRanking(int conferenceId) {
         validateId(conferenceId, "conferenceId");
 
         return conferenceRepository.findConferenceRanking(conferenceId);
     }
 
+    // Gets conference articles
     public List<ConferenceArticleDto> getConferenceArticles(
             int conferenceId,
             Integer startYear,
@@ -101,6 +128,7 @@ public class ConferenceService {
         );
     }
 
+    // Gets articles batch
     public List<ConferenceArticleDto> getConferenceArticlesBatch(
             int conferenceId,
             Integer startYear,
@@ -124,6 +152,7 @@ public class ConferenceService {
         );
     }
 
+    // Normalizes search text
     private String normalizeSearchText(String searchText) {
         if (searchText == null) {
             return "";
@@ -132,6 +161,16 @@ public class ConferenceService {
         return searchText.trim();
     }
 
+    // Normalizes category filter
+    private String normalizeCategoryFilter(String categoryFilter) {
+        if (categoryFilter == null) {
+            return "";
+        }
+
+        return categoryFilter.trim();
+    }
+
+    // Normalizes result limit
     private int normalizeLimit(Integer limit) {
         if (limit == null || limit <= 0) {
             return DEFAULT_SEARCH_LIMIT;
@@ -140,29 +179,32 @@ public class ConferenceService {
         return Math.min(limit, MAX_SEARCH_LIMIT);
     }
 
+    // Normalizes year range
     private YearRange normalizeYearRange(Integer startYear, Integer endYear) {
         int safeStartYear = startYear != null ? startYear : DEFAULT_START_YEAR;
         int safeEndYear = endYear != null ? endYear : DEFAULT_END_YEAR;
 
         if (safeStartYear > safeEndYear) {
-            throw new IllegalArgumentException("Το startYear δεν μπορεί να είναι μεγαλύτερο από το endYear.");
+            throw new IllegalArgumentException("startYear cannot be greater than endYear.");
         }
 
         return new YearRange(safeStartYear, safeEndYear);
     }
 
+    // Normalizes article id
     private int normalizeLastArticleId(Integer lastArticleId) {
         if (lastArticleId == null) {
             return DEFAULT_LAST_ARTICLE_ID;
         }
 
         if (lastArticleId < 0) {
-            throw new IllegalArgumentException("Το lastArticleId δεν μπορεί να είναι αρνητικό.");
+            throw new IllegalArgumentException("lastArticleId cannot be negative.");
         }
 
         return lastArticleId;
     }
 
+    // Normalizes batch size
     private int normalizeBatchSize(Integer batchSize) {
         if (batchSize == null || batchSize <= 0) {
             return DEFAULT_BATCH_SIZE;
@@ -171,9 +213,10 @@ public class ConferenceService {
         return Math.min(batchSize, MAX_BATCH_SIZE);
     }
 
+    // Validates positive id
     private void validateId(int id, String fieldName) {
         if (id <= 0) {
-            throw new IllegalArgumentException("Το " + fieldName + " πρέπει να είναι θετικός αριθμός.");
+            throw new IllegalArgumentException(fieldName + " must be positive.");
         }
     }
 

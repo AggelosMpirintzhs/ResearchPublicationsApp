@@ -18,6 +18,7 @@ import java.util.Optional;
 
 public class YearRepository {
 
+    // Finds available years
     public List<AvailableYearDto> findAvailableYears() {
         String sql = SqlFileLoader.load("sql/year/available_years.sql");
 
@@ -35,10 +36,11 @@ public class YearRepository {
             return results;
 
         } catch (SQLException exception) {
-            throw new RuntimeException("Αποτυχία φόρτωσης διαθέσιμων χρονιών.", exception);
+            throw new RuntimeException("Failed to load available years.", exception);
         }
     }
 
+    // Finds year profile
     public Optional<YearProfileDto> findYearProfile(int year) {
         String sql = SqlFileLoader
                 .load("sql/year/year_profile.sql")
@@ -60,10 +62,11 @@ public class YearRepository {
             }
 
         } catch (SQLException exception) {
-            throw new RuntimeException("Αποτυχία φόρτωσης προφίλ χρονιάς.", exception);
+            throw new RuntimeException("Failed to load year profile.", exception);
         }
     }
 
+    // Finds year publications
     public List<YearPublicationDto> findYearPublications(
             int year,
             String publicationType,
@@ -94,10 +97,11 @@ public class YearRepository {
             }
 
         } catch (SQLException exception) {
-            throw new RuntimeException("Αποτυχία φόρτωσης δημοσιεύσεων χρονιάς.", exception);
+            throw new RuntimeException("Failed to load year publications.", exception);
         }
     }
 
+    // Finds publications batch
     public List<YearPublicationDto> findYearPublicationsBatch(
             int year,
             String publicationType,
@@ -132,10 +136,11 @@ public class YearRepository {
             }
 
         } catch (SQLException exception) {
-            throw new RuntimeException("Αποτυχία φόρτωσης batch δημοσιεύσεων χρονιάς.", exception);
+            throw new RuntimeException("Failed to load year publications batch.", exception);
         }
     }
 
+    // Maps available year
     private AvailableYearDto mapAvailableYear(ResultSet rs) throws SQLException {
         return new AvailableYearDto(
                 getInteger(rs, "year"),
@@ -145,6 +150,7 @@ public class YearRepository {
         );
     }
 
+    // Maps year profile
     private YearProfileDto mapYearProfile(ResultSet rs) throws SQLException {
         return new YearProfileDto(
                 getInteger(rs, "year"),
@@ -162,6 +168,7 @@ public class YearRepository {
         );
     }
 
+    // Maps year publication
     private YearPublicationDto mapYearPublication(ResultSet rs) throws SQLException {
         return new YearPublicationDto(
                 getInteger(rs, "article_id"),
@@ -191,21 +198,25 @@ public class YearRepository {
         );
     }
 
+    // Gets integer value
     private Integer getInteger(ResultSet rs, String columnName) throws SQLException {
         int value = rs.getInt(columnName);
         return rs.wasNull() ? null : value;
     }
 
+    // Gets long value
     private Long getLong(ResultSet rs, String columnName) throws SQLException {
         long value = rs.getLong(columnName);
         return rs.wasNull() ? null : value;
     }
 
+    // Gets double value
     private Double getDouble(ResultSet rs, String columnName) throws SQLException {
         double value = rs.getDouble(columnName);
         return rs.wasNull() ? null : value;
     }
 
+    // Gets local date
     private LocalDate getLocalDate(ResultSet rs, String columnName) throws SQLException {
         Date date = rs.getDate(columnName);
         return date == null ? null : date.toLocalDate();

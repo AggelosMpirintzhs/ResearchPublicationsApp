@@ -257,6 +257,46 @@ class AuthorServiceTest {
     }
 
     @Test
+    void authorPageDataExpectedPublicationCount_returnsTotalArticles_whenProfileExists() {
+        AuthorProfileDto profile = mock(AuthorProfileDto.class);
+
+        when(profile.totalArticles()).thenReturn(25L);
+
+        AuthorService.AuthorPageData pageData =
+                new AuthorService.AuthorPageData(
+                        profile,
+                        List.of(),
+                        List.of()
+                );
+
+        assertTrue(pageData.hasProfile());
+        assertEquals(25L, pageData.expectedPublicationCount());
+
+        verify(profile).totalArticles();
+        verifyNoMoreInteractions(profile);
+    }
+
+    @Test
+    void authorPageDataExpectedPublicationCount_returnsZero_whenProfileTotalArticlesIsNull() {
+        AuthorProfileDto profile = mock(AuthorProfileDto.class);
+
+        when(profile.totalArticles()).thenReturn(null);
+
+        AuthorService.AuthorPageData pageData =
+                new AuthorService.AuthorPageData(
+                        profile,
+                        List.of(),
+                        List.of()
+                );
+
+        assertTrue(pageData.hasProfile());
+        assertEquals(0L, pageData.expectedPublicationCount());
+
+        verify(profile).totalArticles();
+        verifyNoMoreInteractions(profile);
+    }
+
+    @Test
     void getAuthorProfile_usesDefaultYearRange_whenYearsAreNull() {
         int authorId = 3;
         AuthorProfileDto profile = mock(AuthorProfileDto.class);
@@ -508,6 +548,15 @@ class AuthorServiceTest {
     void serviceMethodsThrowException_whenAuthorIdIsNotPositive(int invalidAuthorId) {
         assertThrows(
                 IllegalArgumentException.class,
+                () -> authorService.loadAuthorPageData(
+                        invalidAuthorId,
+                        integer(2010),
+                        integer(2020)
+                )
+        );
+
+        assertThrows(
+                IllegalArgumentException.class,
                 () -> authorService.getAuthorProfile(
                         invalidAuthorId,
                         integer(2010),
@@ -544,11 +593,34 @@ class AuthorServiceTest {
                 )
         );
 
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> authorService.loadAuthorPublicationsInBatches(
+                        invalidAuthorId,
+                        integer(2010),
+                        integer(2020),
+                        integer(0),
+                        integer(100),
+                        batch -> {
+                        },
+                        () -> true
+                )
+        );
+
         verifyNoInteractions(authorRepository);
     }
 
     @Test
     void serviceMethodsThrowException_whenStartYearIsGreaterThanEndYear() {
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> authorService.loadAuthorPageData(
+                        1,
+                        integer(2025),
+                        integer(2020)
+                )
+        );
+
         assertThrows(
                 IllegalArgumentException.class,
                 () -> authorService.getAuthorProfile(
@@ -569,12 +641,35 @@ class AuthorServiceTest {
 
         assertThrows(
                 IllegalArgumentException.class,
+                () -> authorService.getAuthorYearlyStatsByType(
+                        1,
+                        integer(2025),
+                        integer(2020)
+                )
+        );
+
+        assertThrows(
+                IllegalArgumentException.class,
                 () -> authorService.getAuthorPublicationsBatch(
                         1,
                         integer(2025),
                         integer(2020),
                         integer(0),
                         integer(100)
+                )
+        );
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> authorService.loadAuthorPublicationsInBatches(
+                        1,
+                        integer(2025),
+                        integer(2020),
+                        integer(0),
+                        integer(100),
+                        batch -> {
+                        },
+                        () -> true
                 )
         );
 
@@ -591,6 +686,25 @@ class AuthorServiceTest {
                         integer(2020),
                         integer(-1),
                         integer(100)
+                )
+        );
+
+        verifyNoInteractions(authorRepository);
+    }
+
+    @Test
+    void loadAuthorPublicationsInBatchesThrowsException_whenLastArticleIdIsNegative() {
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> authorService.loadAuthorPublicationsInBatches(
+                        1,
+                        integer(2010),
+                        integer(2020),
+                        integer(-1),
+                        integer(100),
+                        batch -> {
+                        },
+                        () -> true
                 )
         );
 

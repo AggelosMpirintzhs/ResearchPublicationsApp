@@ -8,10 +8,11 @@ import javax.sql.DataSource;
 
 public class DataSourceFactory {
 
+    // Prevents object creation
     private DataSourceFactory() {
-        // Utility class. Δεν θέλουμε να δημιουργείται αντικείμενο από αυτή την κλάση.
     }
 
+    // Creates data source
     public static DataSource createDataSource(DatabaseConfig databaseConfig) {
         try {
             Class.forName(databaseConfig.driver());
@@ -35,12 +36,12 @@ public class DataSourceFactory {
 
         } catch (ClassNotFoundException exception) {
             throw new DatabaseConnectionException(
-                    "JDBC driver: not found" + databaseConfig.driver(),
+                    "JDBC driver not found: " + databaseConfig.driver(),
                     exception
             );
         } catch (Exception exception) {
             throw new DatabaseConnectionException(
-                    "Falied to create DataSource.",
+                    "Failed to create DataSource.",
                     exception
             );
         }

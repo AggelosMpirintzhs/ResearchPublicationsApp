@@ -29,11 +29,13 @@ public class VenueService {
     private final JournalService journalService;
     private final ConferenceService conferenceService;
 
+    // Creates venue service
     public VenueService() {
         this.journalService = new JournalService();
         this.conferenceService = new ConferenceService();
     }
 
+    // Creates venue service
     public VenueService(
             JournalService journalService,
             ConferenceService conferenceService
@@ -42,6 +44,7 @@ public class VenueService {
         this.conferenceService = conferenceService;
     }
 
+    // Searches venue results
     public List<Object> searchVenues(
             String venueType,
             String searchText,
@@ -66,6 +69,7 @@ public class VenueService {
         return sortVenueResultsByRelevance(results, searchText);
     }
 
+    // Loads venue page
     public VenuePageData loadVenuePageData(
             String venueType,
             Object selectedVenue,
@@ -135,6 +139,7 @@ public class VenueService {
         );
     }
 
+    // Loads article batches
     public void loadVenueArticlesInBatches(
             String venueType,
             int venueId,
@@ -149,17 +154,17 @@ public class VenueService {
         validateId(venueId, "venueId");
 
         if (onBatchLoaded == null) {
-            throw new IllegalArgumentException("Το onBatchLoaded δεν μπορεί να είναι null.");
+            throw new IllegalArgumentException("onBatchLoaded cannot be null.");
         }
 
         if (shouldContinue == null) {
-            throw new IllegalArgumentException("Το shouldContinue δεν μπορεί να είναι null.");
+            throw new IllegalArgumentException("shouldContinue cannot be null.");
         }
 
         int safeLastArticleId = lastArticleId == null ? 0 : lastArticleId;
 
         if (safeLastArticleId < 0) {
-            throw new IllegalArgumentException("Το lastArticleId δεν μπορεί να είναι αρνητικό.");
+            throw new IllegalArgumentException("lastArticleId cannot be negative.");
         }
 
         while (shouldContinue.getAsBoolean()) {
@@ -203,6 +208,7 @@ public class VenueService {
         }
     }
 
+    // Gets venue id
     public int getVenueId(String venueType, Object venue) {
         validateVenueType(venueType);
 
@@ -213,7 +219,7 @@ public class VenueService {
                 }
             }
 
-            throw new IllegalArgumentException("Δεν βρέθηκε έγκυρο journalId για το επιλεγμένο journal.");
+            throw new IllegalArgumentException("Valid journalId was not found for the selected journal.");
         }
 
         if (venue instanceof ConferenceSearchResultDto conference) {
@@ -222,9 +228,10 @@ public class VenueService {
             }
         }
 
-        throw new IllegalArgumentException("Δεν βρέθηκε έγκυρο conferenceId για το επιλεγμένο conference.");
+        throw new IllegalArgumentException("Valid conferenceId was not found for the selected conference.");
     }
 
+    // Gets display name
     public String getVenueDisplayName(Object venue) {
         if (venue instanceof JournalSearchResultDto journal) {
             if (journal.journalName() != null && !journal.journalName().isBlank()) {
@@ -257,6 +264,7 @@ public class VenueService {
         return "Unknown venue";
     }
 
+    // Gets article count
     public long getExpectedArticleCount(Object profile) {
         if (profile instanceof JournalProfileDto journalProfile) {
             return defaultLong(journalProfile.totalArticles());
@@ -269,6 +277,7 @@ public class VenueService {
         return 0L;
     }
 
+    // Sorts venue results
     private List<Object> sortVenueResultsByRelevance(
             List<Object> results,
             String query
@@ -301,6 +310,7 @@ public class VenueService {
         return sortedResults;
     }
 
+    // Scores venue relevance
     private int venueRelevanceScore(Object venue, String query) {
         String title = normalizeSearchText(getVenueTitleForSearch(venue));
         String acronym = normalizeSearchText(getVenueAcronymForSearch(venue));
@@ -325,6 +335,7 @@ public class VenueService {
         return 4;
     }
 
+    // Checks query words
     private boolean containsAllQueryWords(String text, String query) {
         if (query == null || query.isBlank()) {
             return true;
@@ -339,6 +350,7 @@ public class VenueService {
         return true;
     }
 
+    // Gets searchable title
     private String getVenueTitleForSearch(Object venue) {
         if (venue instanceof JournalSearchResultDto journal) {
             return journal.journalName();
@@ -351,6 +363,7 @@ public class VenueService {
         return "";
     }
 
+    // Gets searchable acronym
     private String getVenueAcronymForSearch(Object venue) {
         if (venue instanceof ConferenceSearchResultDto conference) {
             return conference.acronym();
@@ -359,6 +372,7 @@ public class VenueService {
         return "";
     }
 
+    // Extracts article id
     private Integer extractArticleId(Object article) {
         if (article instanceof JournalArticleDto journalArticle) {
             return journalArticle.articleId();
@@ -371,6 +385,7 @@ public class VenueService {
         return null;
     }
 
+    // Normalizes search text
     private String normalizeSearchText(String text) {
         if (text == null) {
             return "";
@@ -385,19 +400,22 @@ public class VenueService {
                 .replaceAll("\\s+", " ");
     }
 
+    // Returns default long
     private long defaultLong(Long value) {
         return value == null ? 0L : value;
     }
 
+    // Validates venue type
     private void validateVenueType(String venueType) {
         if (!TYPE_JOURNAL.equals(venueType) && !TYPE_CONFERENCE.equals(venueType)) {
-            throw new IllegalArgumentException("Μη έγκυρος τύπος venue.");
+            throw new IllegalArgumentException("Invalid venue type.");
         }
     }
 
+    // Validates positive id
     private void validateId(int id, String fieldName) {
         if (id <= 0) {
-            throw new IllegalArgumentException("Το " + fieldName + " πρέπει να είναι θετικός αριθμός.");
+            throw new IllegalArgumentException(fieldName + " must be a positive number.");
         }
     }
 
@@ -408,16 +426,19 @@ public class VenueService {
             Object ranking,
             List<Object> yearlyStats
     ) {
+        // Checks available data
         public boolean hasAnyData() {
             return profile != null
                     || ranking != null
                     || yearlyStats != null && !yearlyStats.isEmpty();
         }
 
+        // Checks article data
         public boolean hasArticleData() {
             return profile != null && expectedArticleCount() > 0;
         }
 
+        // Gets article count
         public long expectedArticleCount() {
             if (profile instanceof JournalProfileDto journalProfile) {
                 return journalProfile.totalArticles() == null ? 0L : journalProfile.totalArticles();

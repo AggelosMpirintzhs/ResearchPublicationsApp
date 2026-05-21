@@ -37,7 +37,7 @@ class SqlFileLoaderTest {
         );
 
         Assertions.assertEquals(
-                "Το path του SQL αρχείου δεν μπορεί να είναι κενό.",
+                "SQL file path cannot be empty.",
                 exception.getMessage()
         );
     }
@@ -50,7 +50,7 @@ class SqlFileLoaderTest {
         );
 
         Assertions.assertEquals(
-                "Το path του SQL αρχείου δεν μπορεί να είναι κενό.",
+                "SQL file path cannot be empty.",
                 exception.getMessage()
         );
     }
@@ -63,7 +63,7 @@ class SqlFileLoaderTest {
         );
 
         Assertions.assertTrue(
-                exception.getMessage().contains("Δεν βρέθηκε το SQL αρχείο στα resources:")
+                exception.getMessage().contains("SQL file not found in resources:")
         );
     }
 

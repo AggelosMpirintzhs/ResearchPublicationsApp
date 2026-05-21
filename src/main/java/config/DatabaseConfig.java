@@ -8,6 +8,7 @@ public record DatabaseConfig(
         int poolSize
 ) {
 
+    // Creates database config
     public static DatabaseConfig from(AppConfig appConfig) {
         return new DatabaseConfig(
                 appConfig.getString("db.url"),
@@ -18,14 +19,17 @@ public record DatabaseConfig(
         );
     }
 
+    // Checks SQLite database
     public boolean isSQLite() {
         return url != null && url.startsWith("jdbc:sqlite:");
     }
 
+    // Checks PostgreSQL database
     public boolean isPostgreSQL() {
         return url != null && url.startsWith("jdbc:postgresql:");
     }
 
+    // Checks MySQL database
     public boolean isMySQL() {
         return url != null && url.startsWith("jdbc:mysql:");
     }

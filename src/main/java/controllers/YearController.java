@@ -23,6 +23,8 @@ import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.VBox;
+import javafx.scene.input.KeyCode;
+import javafx.scene.input.MouseButton;
 import service.YearService;
 import util.TableCopySupport;
 import util.TableSearchSupport;
@@ -47,11 +49,6 @@ public class YearController {
     private final ObservableList<YearPublicationDto> publicationItems =
             FXCollections.observableArrayList();
 
-    /*
-     * To loadVersion mas prostateuei apo palia background tasks.
-     * An o xristis patisei Clear i fortosei alli xronia, ta palia tasks
-     * den prepei na ksanaenimerosoun to UI.
-     */
     private final AtomicInteger loadVersion = new AtomicInteger(0);
 
     private volatile boolean stopPublicationLoading = false;
@@ -60,10 +57,6 @@ public class YearController {
 
     private long expectedPublicationCount = 0;
 
-    /*
-     * The in-table search logic is now handled by TableSearchSupport.
-     * This keeps the controller smaller and avoids duplicate search/highlight code.
-     */
     private TableSearchSupport<YearPublicationDto> publicationSearchSupport;
 
     @FXML
@@ -162,6 +155,7 @@ public class YearController {
     @FXML
     private TableColumn<YearPublicationDto, String> publicationUrlColumn;
 
+    // Initializes year page
     @FXML
     public void initialize() {
         setupYearComboBox();
@@ -174,9 +168,11 @@ public class YearController {
         loadAvailableYears();
     }
 
+    // Loads available years
     @FXML
     private void loadAvailableYears() {
         Task<List<AvailableYearDto>> task = new Task<>() {
+            // Gets year list
             @Override
             protected List<AvailableYearDto> call() {
                 return yearService.getAvailableYears();
@@ -214,6 +210,7 @@ public class YearController {
         startBackgroundTask(task, "available-years-task");
     }
 
+    // Loads year profile
     @FXML
     private void loadYearProfile() {
         stopCurrentPublicationLoading();
@@ -235,12 +232,6 @@ public class YearController {
                 loadPublicationsCheckBox != null && loadPublicationsCheckBox.isSelected();
 
         updateSelectedYearLabel(selectedYear);
-
-        /*
-         * Fast preview:
-         * Ta vasika counts iparxoun idi sto AvailableYearDto apo to dropdown.
-         * Ta emfanizoume amesa, prin girisei to varitero year_profile query.
-         */
         updateFastYearPreview(selectedYear);
 
         expectedPublicationCount =
@@ -265,12 +256,8 @@ public class YearController {
             setPublicationLoadingText("Publication loading is disabled.");
         }
 
-        /*
-         * Full profile:
-         * Trexei parallila me to proto batch ton articles.
-         * Etsi den perimenei o xristis na teleiosei to ena gia na arxisei to allo.
-         */
         Task<YearService.YearPageData> task = new Task<>() {
+            // Loads profile data
             @Override
             protected YearService.YearPageData call() {
                 return yearService.loadYearPageData(
@@ -306,10 +293,6 @@ public class YearController {
             updateSelectedYearLabel(selectedYear);
             updateProfileLabels(profileDto);
 
-            /*
-             * Otan girisei to plires profile, kanoume update to total tou counter
-             * me tin pio akrivi timi.
-             */
             expectedPublicationCount = data.expectedPublicationCount();
             updateArticlesLoadedLabel(publicationItems.size(), expectedPublicationCount);
 
@@ -332,6 +315,7 @@ public class YearController {
         startBackgroundTask(task, "year-profile-task");
     }
 
+    // Starts publication loading
     private void startPublicationBatchLoading(
             int year,
             String publicationType,
@@ -342,6 +326,7 @@ public class YearController {
         stopPublicationLoading = false;
 
         publicationLoadingTask = new Task<>() {
+            // Loads publication batches
             @Override
             protected Void call() {
                 yearService.loadYearPublicationsInBatches(
@@ -424,6 +409,7 @@ public class YearController {
         startBackgroundTask(publicationLoadingTask, "publication-batch-loading-task");
     }
 
+    // Stops publication loading
     private void stopCurrentPublicationLoading() {
         stopPublicationLoading = true;
 
@@ -432,6 +418,7 @@ public class YearController {
         }
     }
 
+    // Finds next publication
     @FXML
     private void findNextPublicationMatch() {
         if (publicationSearchSupport != null) {
@@ -439,6 +426,7 @@ public class YearController {
         }
     }
 
+    // Resets publication search
     private void resetPublicationSearchNavigation() {
         if (publicationSearchSupport != null) {
             publicationSearchSupport.resetNavigation();
@@ -447,12 +435,14 @@ public class YearController {
         }
     }
 
+    // Clears publication search
     private void clearPublicationSearchText() {
         if (publicationSearchSupport != null) {
             publicationSearchSupport.clearSearchText();
         }
     }
 
+    // Clears year page
     @FXML
     private void clear() {
         loadVersion.incrementAndGet();
@@ -477,6 +467,7 @@ public class YearController {
         setLoading(false);
     }
 
+    // Returns to home
     @FXML
     private void backToHome() {
         loadVersion.incrementAndGet();
@@ -498,25 +489,46 @@ public class YearController {
         }
     }
 
+    // Sets year combo
     private void setupYearComboBox() {
         if (yearComboBox == null) {
             return;
         }
 
-        yearComboBox.setCellFactory(listView -> new ListCell<>() {
-            @Override
-            protected void updateItem(AvailableYearDto yearDto, boolean empty) {
-                super.updateItem(yearDto, empty);
+        yearComboBox.setCellFactory(listView -> {
+            ListCell<AvailableYearDto> cell = new ListCell<>() {
+                // Updates year cell
+                @Override
+                protected void updateItem(AvailableYearDto yearDto, boolean empty) {
+                    super.updateItem(yearDto, empty);
 
-                if (empty || yearDto == null) {
-                    setText(null);
-                } else {
-                    setText(buildYearDisplayName(yearDto));
+                    if (empty || yearDto == null) {
+                        setText(null);
+                    } else {
+                        setText(buildYearDisplayName(yearDto));
+                    }
                 }
-            }
+            };
+
+            cell.setOnMouseClicked(event -> {
+                if (
+                        event.getButton() == MouseButton.PRIMARY
+                                && event.getClickCount() == 2
+                                && !cell.isEmpty()
+                ) {
+                    yearComboBox.getSelectionModel().select(cell.getItem());
+                    yearComboBox.hide();
+
+                    openSelectedYearProfile();
+                    event.consume();
+                }
+            });
+
+            return cell;
         });
 
         yearComboBox.setButtonCell(new ListCell<>() {
+            // Updates button cell
             @Override
             protected void updateItem(AvailableYearDto yearDto, boolean empty) {
                 super.updateItem(yearDto, empty);
@@ -532,8 +544,32 @@ public class YearController {
         yearComboBox.setOnAction(event ->
                 updateSelectedYearLabel(yearComboBox.getValue())
         );
+
+        yearComboBox.setOnKeyReleased(event -> {
+            if (event.getCode() == KeyCode.ENTER) {
+                openSelectedYearProfile();
+                event.consume();
+            }
+        });
     }
 
+    // Opens selected year
+    private void openSelectedYearProfile() {
+        if (yearComboBox == null) {
+            return;
+        }
+
+        AvailableYearDto selectedYear = yearComboBox.getValue();
+
+        if (selectedYear == null) {
+            return;
+        }
+
+        updateSelectedYearLabel(selectedYear);
+        loadYearProfile();
+    }
+
+    // Sets publication types
     private void setupPublicationTypeComboBox() {
         if (publicationTypeComboBox == null) {
             return;
@@ -548,6 +584,7 @@ public class YearController {
         publicationTypeComboBox.getSelectionModel().select(YearService.PUBLICATION_TYPE_ALL);
     }
 
+    // Sets publication option
     private void setupLoadPublicationsOption() {
         updatePublicationReportVisibility();
 
@@ -567,6 +604,7 @@ public class YearController {
         }
     }
 
+    // Updates report visibility
     private void updatePublicationReportVisibility() {
         boolean visible = loadPublicationsCheckBox != null && loadPublicationsCheckBox.isSelected();
 
@@ -576,6 +614,7 @@ public class YearController {
         }
     }
 
+    // Sets publication table
     private void setupPublicationTable() {
         if (publicationsTable != null) {
             publicationsTable.setItems(publicationItems);
@@ -636,6 +675,7 @@ public class YearController {
         }
     }
 
+    // Sets table search
     private void setupPublicationSearchSupport() {
         publicationSearchSupport = new TableSearchSupport<>(
                 publicationsTable,
@@ -667,15 +707,12 @@ public class YearController {
         publicationSearchSupport.initialize(SEARCH_MODE_TITLE);
     }
 
+    // Updates fast preview
     private void updateFastYearPreview(AvailableYearDto yearDto) {
         if (yearDto == null) {
             return;
         }
 
-        /*
-         * Amesa statistics apo to AvailableYearDto.
-         * Ta ipoloipa tha gemisoun otan epistrepsei to plires YearProfileDto.
-         */
         setLabelText(yearLabel, yearDto.year());
 
         setLabelText(totalArticlesLabel, yearDto.totalArticles());
@@ -690,6 +727,7 @@ public class YearController {
         setLabelText(avgAuthorsPerArticleLabel, "-");
     }
 
+    // Updates profile labels
     private void updateProfileLabels(YearProfileDto profile) {
         setLabelText(yearLabel, profile.year());
 
@@ -705,6 +743,7 @@ public class YearController {
         setLabelText(avgAuthorsPerArticleLabel, formatDouble(profile.avgAuthorsPerArticle()));
     }
 
+    // Clears result area
     private void clearResultArea() {
         setLabelText(yearLabel, "-");
 
@@ -726,6 +765,7 @@ public class YearController {
         updateArticlesLoadedLabel(0, 0);
     }
 
+    // Updates selected year
     private void updateSelectedYearLabel(AvailableYearDto yearDto) {
         if (selectedYearLabel == null) {
             return;
@@ -738,6 +778,7 @@ public class YearController {
         }
     }
 
+    // Builds year name
     private String buildYearDisplayName(AvailableYearDto yearDto) {
         if (yearDto == null || yearDto.year() == null) {
             return "Unknown year";
@@ -746,6 +787,7 @@ public class YearController {
         return String.valueOf(yearDto.year());
     }
 
+    // Gets publication type
     private String getSelectedPublicationType() {
         if (publicationTypeComboBox == null || publicationTypeComboBox.getValue() == null) {
             return YearService.PUBLICATION_TYPE_ALL;
@@ -754,6 +796,7 @@ public class YearController {
         return publicationTypeComboBox.getValue();
     }
 
+    // Updates loaded label
     private void updateArticlesLoadedLabel(long loaded, long total) {
         if (articlesLoadedLabel != null) {
             articlesLoadedLabel.setText(
@@ -762,12 +805,14 @@ public class YearController {
         }
     }
 
+    // Updates loading text
     private void setPublicationLoadingText(String text) {
         if (publicationLoadingLabel != null) {
             publicationLoadingLabel.setText(text);
         }
     }
 
+    // Builds venue name
     private String buildVenueDisplayName(YearPublicationDto publication) {
         if (publication == null) {
             return "-";
@@ -792,6 +837,7 @@ public class YearController {
         return "-";
     }
 
+    // Gets first text
     private String firstNonBlank(String first, String second) {
         if (first != null && !first.isBlank()) {
             return first;
@@ -804,12 +850,14 @@ public class YearController {
         return "-";
     }
 
+    // Sets label text
     private void setLabelText(Label label, Object value) {
         if (label != null) {
             label.setText(value == null ? "-" : String.valueOf(value));
         }
     }
 
+    // Converts null text
     private String nullToDash(Object value) {
         if (value == null) {
             return "-";
@@ -824,6 +872,7 @@ public class YearController {
         return text;
     }
 
+    // Formats decimal value
     private String formatDouble(Double value) {
         if (value == null) {
             return "-";
@@ -832,6 +881,7 @@ public class YearController {
         return String.format("%.2f", value);
     }
 
+    // Sets year loading
     private void setYearLoading(boolean loading) {
         if (yearComboBox != null) {
             yearComboBox.setDisable(loading);
@@ -842,11 +892,8 @@ public class YearController {
         }
     }
 
+    // Sets loading state
     private void setLoading(boolean loading) {
-        /*
-         * Kratame to Clear energopoiimeno gia na mporei o xristis
-         * na stamataei/akyronei mia fortosi pou argise.
-         */
         if (yearComboBox != null) {
             yearComboBox.setDisable(loading);
         }
@@ -866,20 +913,16 @@ public class YearController {
         if (refreshYearsButton != null) {
             refreshYearsButton.setDisable(loading);
         }
-
-        /*
-         * Den kanoume disable to in-table search.
-         * Etsi o xristis mporei na psaxnei mesa sta rows pou exoun idi fortothei,
-         * akoma kai an ta epomena batches sinexizoun na erxontai.
-         */
     }
 
+    // Starts background task
     private void startBackgroundTask(Task<?> task, String threadName) {
         Thread thread = new Thread(task, threadName);
         thread.setDaemon(true);
         thread.start();
     }
 
+    // Shows error alert
     private void showError(String title, String message) {
         Alert alert = new Alert(Alert.AlertType.ERROR);
         alert.setTitle(title);
@@ -888,6 +931,7 @@ public class YearController {
         alert.showAndWait();
     }
 
+    // Shows info alert
     private void showInfo(String title, String message) {
         Alert alert = new Alert(Alert.AlertType.INFORMATION);
         alert.setTitle(title);

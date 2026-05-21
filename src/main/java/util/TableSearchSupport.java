@@ -46,6 +46,7 @@ public class TableSearchSupport<S> {
 
     private int currentSearchIndex = -1;
 
+    // Creates search support
     public TableSearchSupport(
             TableView<S> tableView,
             ObservableList<S> items,
@@ -62,6 +63,7 @@ public class TableSearchSupport<S> {
         this.statusLabel = statusLabel;
     }
 
+    // Adds search mode
     public void addSearchMode(
             String modeName,
             TableColumn<S, String> column,
@@ -79,6 +81,7 @@ public class TableSearchSupport<S> {
         installSearchableCellFactory(column, modeName);
     }
 
+    // Initializes search controls
     public void initialize(String defaultMode) {
         if (modeComboBox != null) {
             modeComboBox.getItems().setAll(searchModes.keySet());
@@ -141,6 +144,7 @@ public class TableSearchSupport<S> {
         refreshStatus();
     }
 
+    // Finds next match
     public void findNext() {
         String query = getCurrentQuery();
 
@@ -177,10 +181,12 @@ public class TableSearchSupport<S> {
         refreshStatus();
     }
 
+    // Resets search position
     public void resetNavigation() {
         currentSearchIndex = -1;
     }
 
+    // Clears search text
     public void clearSearchText() {
         resetNavigation();
 
@@ -192,6 +198,7 @@ public class TableSearchSupport<S> {
         refreshTable();
     }
 
+    // Refreshes search status
     public void refreshStatus() {
         String query = getCurrentQuery();
 
@@ -221,12 +228,14 @@ public class TableSearchSupport<S> {
         }
     }
 
+    // Refreshes table view
     public void refreshTable() {
         if (tableView != null) {
             tableView.refresh();
         }
     }
 
+    // Applies selection style
     public static <S> void applyReadableSelectionStyle(TableView<S> tableView) {
         if (tableView == null) {
             return;
@@ -241,6 +250,7 @@ public class TableSearchSupport<S> {
         );
     }
 
+    // Creates plain column
     public static <S> void makePlainTextColumn(TableColumn<S, String> column) {
         if (column == null) {
             return;
@@ -274,6 +284,7 @@ public class TableSearchSupport<S> {
                 });
             }
 
+            // Updates cell item
             @Override
             protected void updateItem(String item, boolean empty) {
                 super.updateItem(item, empty);
@@ -293,6 +304,7 @@ public class TableSearchSupport<S> {
                 showTextOnly();
             }
 
+            // Shows plain text
             private void showTextOnly() {
                 setContentDisplay(ContentDisplay.TEXT_ONLY);
                 setGraphic(null);
@@ -301,6 +313,7 @@ public class TableSearchSupport<S> {
                 setWrapText(false);
             }
 
+            // Shows text field
             private void showTextField() {
                 String text = getItem() == null ? "" : getItem();
                 textField.setText(text);
@@ -313,6 +326,7 @@ public class TableSearchSupport<S> {
         });
     }
 
+    // Installs cell factory
     private void installSearchableCellFactory(
             TableColumn<S, String> column,
             String modeName
@@ -324,6 +338,7 @@ public class TableSearchSupport<S> {
         column.setCellFactory(tableColumn -> new SearchableTableCell(modeName));
     }
 
+    // Finds match index
     private int findNextMatchIndex(String query, SearchMode<S> mode) {
         int size = items.size();
         int startIndex = currentSearchIndex < 0 ? 0 : currentSearchIndex + 1;
@@ -340,6 +355,7 @@ public class TableSearchSupport<S> {
         return -1;
     }
 
+    // Checks item match
     private boolean matches(S item, String query, SearchMode<S> mode) {
         if (item == null || query == null || query.isBlank() || mode == null) {
             return false;
@@ -354,6 +370,7 @@ public class TableSearchSupport<S> {
         return text.toLowerCase(Locale.ROOT).contains(query.toLowerCase(Locale.ROOT));
     }
 
+    // Calculates search stats
     private SearchStats calculateStats(String query, SearchMode<S> mode) {
         int totalMatches = 0;
         int selectedMatchNumber = 0;
@@ -375,6 +392,7 @@ public class TableSearchSupport<S> {
         return new SearchStats(totalMatches, selectedMatchNumber);
     }
 
+    // Selects matched row
     private void selectAndScrollTo(int rowIndex, TableColumn<S, String> targetColumn) {
         if (tableView == null || rowIndex < 0 || rowIndex >= items.size()) {
             return;
@@ -402,6 +420,7 @@ public class TableSearchSupport<S> {
         });
     }
 
+    // Gets selected mode
     private SearchMode<S> getSelectedMode() {
         if (modeComboBox == null || modeComboBox.getValue() == null) {
             if (searchModes.isEmpty()) {
@@ -424,6 +443,7 @@ public class TableSearchSupport<S> {
         return searchModes.values().iterator().next();
     }
 
+    // Gets current query
     private String getCurrentQuery() {
         if (searchField == null || searchField.getText() == null) {
             return "";
@@ -432,12 +452,14 @@ public class TableSearchSupport<S> {
         return searchField.getText().trim();
     }
 
+    // Updates status text
     private void setStatus(String text) {
         if (statusLabel != null) {
             statusLabel.setText(text == null ? EMPTY_STATUS : text);
         }
     }
 
+    // Builds highlighted text
     private TextFlow buildHighlightedTextFlow(String text, String query, Font font) {
         TextFlow textFlow = new TextFlow();
         textFlow.setMouseTransparent(true);
@@ -476,6 +498,7 @@ public class TableSearchSupport<S> {
         return textFlow;
     }
 
+    // Creates normal text
     private Text createNormalText(String text, Font font) {
         Text normalText = new Text(text == null ? "" : text);
         normalText.setFont(font);
@@ -483,6 +506,7 @@ public class TableSearchSupport<S> {
         return normalText;
     }
 
+    // Creates matched text
     private Text createMatchedText(String text, Font font) {
         Text matchedText = new Text(text == null ? "" : text);
         matchedText.setFont(font);
@@ -495,12 +519,14 @@ public class TableSearchSupport<S> {
         return matchedText;
     }
 
+    // Measures text width
     private double measureTextWidth(String text, Font font) {
         Text measure = new Text(text == null ? "" : text);
         measure.setFont(font);
         return measure.getLayoutBounds().getWidth();
     }
 
+    // Returns safe text
     private String safeText(String text) {
         if (text == null) {
             return "";
@@ -509,6 +535,7 @@ public class TableSearchSupport<S> {
         return text;
     }
 
+    // Builds readonly field
     private static TextField buildReadonlyTextField() {
         TextField textField = new TextField();
         textField.setEditable(false);
@@ -526,6 +553,7 @@ public class TableSearchSupport<S> {
         private final String modeName;
         private final TextField textField = buildReadonlyTextField();
 
+        // Creates searchable cell
         private SearchableTableCell(String modeName) {
             this.modeName = modeName;
 
@@ -553,6 +581,7 @@ public class TableSearchSupport<S> {
             });
         }
 
+        // Updates cell item
         @Override
         protected void updateItem(String item, boolean empty) {
             super.updateItem(item, empty);
@@ -572,6 +601,7 @@ public class TableSearchSupport<S> {
             showCellText();
         }
 
+        // Shows cell text
         private void showCellText() {
             String item = getItem();
 
@@ -600,6 +630,7 @@ public class TableSearchSupport<S> {
             setContentDisplay(ContentDisplay.GRAPHIC_ONLY);
         }
 
+        // Shows text field
         private void showTextField() {
             String text = getItem() == null ? "" : getItem();
             textField.setText(text);
@@ -610,11 +641,13 @@ public class TableSearchSupport<S> {
             textField.positionCaret(text.length());
         }
 
+        // Gets mode name
         private String getSelectedModeName() {
             SearchMode<S> selectedMode = getSelectedMode();
             return selectedMode == null ? "" : selectedMode.name();
         }
 
+        // Builds highlighted graphic
         private StackPane buildSingleLineHighlightedGraphic(String text, String query, Font font) {
             TextFlow textFlow = buildHighlightedTextFlow(text, query, font);
             Label ellipsisLabel = new Label("...");

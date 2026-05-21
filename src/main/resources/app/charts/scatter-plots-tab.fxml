@@ -16,6 +16,7 @@
 
 <ScrollPane xmlns="http://javafx.com/javafx"
             xmlns:fx="http://javafx.com/fxml"
+            fx:id="scatterPageScrollPane"
             fx:controller="controllers.charts.ScatterPlotsController"
             fitToWidth="true"
             hbarPolicy="NEVER"
@@ -224,7 +225,7 @@
                         <Label text="Journal Ranking Scatter Plot"
                                styleClass="content-title"/>
 
-                        <Label text="Choose any two journal ranking metrics. Each point represents one journal."
+                        <Label text="Choose any two ranking metrics and a Top N limit. Each point represents one journal from the ranking dataset."
                                wrapText="true"
                                styleClass="stat-muted"/>
                     </VBox>
@@ -244,14 +245,9 @@
                                   styleClass="form-control"/>
 
                         <ComboBox fx:id="rankingLimitComboBox"
-                                  promptText="Limit"
-                                  prefWidth="130"
+                                  promptText="Top N journals"
+                                  prefWidth="170"
                                   styleClass="form-control"/>
-
-                        <TextField fx:id="rankingJournalFilterField"
-                                   promptText="Optional journal filter"
-                                   HBox.hgrow="ALWAYS"
-                                   styleClass="form-control"/>
 
                         <Button fx:id="loadRankingScatterButton"
                                 text="Load Ranking Scatter"
@@ -265,7 +261,7 @@
                     </HBox>
 
                     <Label fx:id="rankingStatusLabel"
-                           text="Choose ranking metrics and load journal ranking scatter."
+                           text="Choose ranking metrics and top N limit, then load journal ranking scatter."
                            styleClass="hint-label"/>
                 </VBox>
 

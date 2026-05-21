@@ -1,13 +1,15 @@
 package repository;
 
 import db.DatabaseManager;
+import dto.chart.CategoryOptionDto;
+import dto.chart.CategoryTrendDto;
 import dto.conference.ConferenceArticleDto;
 import dto.conference.ConferenceProfileDto;
 import dto.conference.ConferenceRankingDto;
 import dto.conference.ConferenceSearchResultDto;
 import dto.conference.ConferenceYearlyStatsDto;
 import util.SqlFileLoader;
-import dto.chart.CategoryOptionDto;
+
 import java.sql.Connection;
 import java.sql.Date;
 import java.sql.PreparedStatement;
@@ -20,6 +22,7 @@ import java.util.Optional;
 
 public class ConferenceRepository {
 
+    // Searches conference records
     public List<ConferenceSearchResultDto> searchConferences(String searchText, int limit) {
         String sql = SqlFileLoader.load("sql/conference/search_conferences.sql");
 
@@ -42,10 +45,11 @@ public class ConferenceRepository {
             }
 
         } catch (SQLException exception) {
-            throw new RuntimeException("Αποτυχία αναζήτησης συνεδρίων.", exception);
+            throw new RuntimeException("Failed to search conferences.", exception);
         }
     }
 
+    // Finds conference profile
     public Optional<ConferenceProfileDto> findConferenceProfile(
             int conferenceId,
             int startYear,
@@ -70,10 +74,11 @@ public class ConferenceRepository {
             }
 
         } catch (SQLException exception) {
-            throw new RuntimeException("Αποτυχία φόρτωσης προφίλ συνεδρίου.", exception);
+            throw new RuntimeException("Failed to load conference profile.", exception);
         }
     }
 
+    // Finds articles batch
     public List<ConferenceArticleDto> findConferenceArticlesBatch(
             int conferenceId,
             int startYear,
@@ -104,10 +109,11 @@ public class ConferenceRepository {
             }
 
         } catch (SQLException exception) {
-            throw new RuntimeException("Αποτυχία φόρτωσης batch άρθρων συνεδρίου.", exception);
+            throw new RuntimeException("Failed to load conference articles batch.", exception);
         }
     }
 
+    // Finds yearly stats
     public List<ConferenceYearlyStatsDto> findConferenceYearlyStats(
             int conferenceId,
             int startYear,
@@ -134,10 +140,11 @@ public class ConferenceRepository {
             }
 
         } catch (SQLException exception) {
-            throw new RuntimeException("Αποτυχία φόρτωσης yearly stats συνεδρίου.", exception);
+            throw new RuntimeException("Failed to load conference yearly stats.", exception);
         }
     }
 
+    // Finds conference ranking
     public Optional<ConferenceRankingDto> findConferenceRanking(int conferenceId) {
         String sql = SqlFileLoader.load("sql/conference/conference_ranking.sql");
 
@@ -156,10 +163,11 @@ public class ConferenceRepository {
             }
 
         } catch (SQLException exception) {
-            throw new RuntimeException("Αποτυχία φόρτωσης ranking συνεδρίου.", exception);
+            throw new RuntimeException("Failed to load conference ranking.", exception);
         }
     }
 
+    // Finds conference articles
     public List<ConferenceArticleDto> findConferenceArticles(
             int conferenceId,
             int startYear,
@@ -186,10 +194,11 @@ public class ConferenceRepository {
             }
 
         } catch (SQLException exception) {
-            throw new RuntimeException("Αποτυχία φόρτωσης άρθρων συνεδρίου.", exception);
+            throw new RuntimeException("Failed to load conference articles.", exception);
         }
     }
 
+    // Finds FoR categories
     public List<CategoryOptionDto> findPrimaryFoRCategories() {
         String sql = SqlFileLoader.load("sql/conference/conference_primary_for_categories.sql");
 
@@ -212,10 +221,44 @@ public class ConferenceRepository {
             return results;
 
         } catch (SQLException exception) {
-            throw new RuntimeException("Αποτυχία φόρτωσης PrimaryFoR κατηγοριών.", exception);
+            throw new RuntimeException("Failed to load PrimaryFoR categories.", exception);
         }
     }
 
+    // Finds yearly trends
+    public List<CategoryTrendDto> findConferencePrimaryFoRYearlyTrends(
+            String categoryFilter,
+            int startYear,
+            int endYear
+    ) {
+        String sql = SqlFileLoader.load("sql/conference/conference_primary_for_yearly_trends.sql");
+        String safeCategoryFilter = categoryFilter == null ? "" : categoryFilter.trim();
+
+        try (
+                Connection connection = DatabaseManager.getConnection();
+                PreparedStatement statement = connection.prepareStatement(sql)
+        ) {
+            statement.setString(1, safeCategoryFilter);
+            statement.setString(2, safeCategoryFilter);
+            statement.setInt(3, startYear);
+            statement.setInt(4, endYear);
+
+            try (ResultSet rs = statement.executeQuery()) {
+                List<CategoryTrendDto> results = new ArrayList<>();
+
+                while (rs.next()) {
+                    results.add(mapCategoryTrend(rs));
+                }
+
+                return results;
+            }
+
+        } catch (SQLException exception) {
+            throw new RuntimeException("Failed to load PrimaryFoR yearly trends.", exception);
+        }
+    }
+
+    // Maps search result
     private ConferenceSearchResultDto mapConferenceSearchResult(ResultSet rs) throws SQLException {
         return new ConferenceSearchResultDto(
                 getInteger(rs, "conference_id"),
@@ -225,6 +268,7 @@ public class ConferenceRepository {
         );
     }
 
+    // Maps conference profile
     private ConferenceProfileDto mapConferenceProfile(ResultSet rs) throws SQLException {
         return new ConferenceProfileDto(
                 getInteger(rs, "conference_id"),
@@ -246,6 +290,7 @@ public class ConferenceRepository {
         );
     }
 
+    // Maps yearly stats
     private ConferenceYearlyStatsDto mapConferenceYearlyStats(ResultSet rs) throws SQLException {
         return new ConferenceYearlyStatsDto(
                 getInteger(rs, "conference_id"),
@@ -260,6 +305,7 @@ public class ConferenceRepository {
         );
     }
 
+    // Maps conference ranking
     private ConferenceRankingDto mapConferenceRanking(ResultSet rs) throws SQLException {
         return new ConferenceRankingDto(
                 getInteger(rs, "conference_id"),
@@ -273,6 +319,7 @@ public class ConferenceRepository {
         );
     }
 
+    // Maps conference article
     private ConferenceArticleDto mapConferenceArticle(ResultSet rs) throws SQLException {
         return new ConferenceArticleDto(
                 getInteger(rs, "article_id"),
@@ -296,21 +343,34 @@ public class ConferenceRepository {
         );
     }
 
+    // Maps category trend
+    private CategoryTrendDto mapCategoryTrend(ResultSet rs) throws SQLException {
+        return new CategoryTrendDto(
+                rs.getString("category"),
+                rs.getInt("year"),
+                rs.getLong("count")
+        );
+    }
+
+    // Gets integer value
     private Integer getInteger(ResultSet rs, String columnName) throws SQLException {
         int value = rs.getInt(columnName);
         return rs.wasNull() ? null : value;
     }
 
+    // Gets long value
     private Long getLong(ResultSet rs, String columnName) throws SQLException {
         long value = rs.getLong(columnName);
         return rs.wasNull() ? null : value;
     }
 
+    // Gets double value
     private Double getDouble(ResultSet rs, String columnName) throws SQLException {
         double value = rs.getDouble(columnName);
         return rs.wasNull() ? null : value;
     }
 
+    // Gets local date
     private LocalDate getLocalDate(ResultSet rs, String columnName) throws SQLException {
         Date date = rs.getDate(columnName);
         return date == null ? null : date.toLocalDate();

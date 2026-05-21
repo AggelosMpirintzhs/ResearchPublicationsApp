@@ -30,14 +30,17 @@ public class AuthorService {
 
     private final AuthorRepository authorRepository;
 
+    // Creates author service
     public AuthorService() {
         this.authorRepository = new AuthorRepository();
     }
 
+    // Creates author service
     public AuthorService(AuthorRepository authorRepository) {
         this.authorRepository = authorRepository;
     }
 
+    // Searches author names
     public List<AuthorSearchResultDto> searchAuthors(String searchText, Integer limit) {
         String normalizedSearchText = normalizeSearchText(searchText);
 
@@ -53,6 +56,7 @@ public class AuthorService {
         return sortAuthorsByRelevance(results, normalizedSearchText);
     }
 
+    // Loads author page
     public AuthorPageData loadAuthorPageData(
             int authorId,
             Integer startYear,
@@ -90,6 +94,7 @@ public class AuthorService {
         );
     }
 
+    // Loads publication batches
     public void loadAuthorPublicationsInBatches(
             int authorId,
             Integer startYear,
@@ -102,11 +107,11 @@ public class AuthorService {
         validateId(authorId, "authorId");
 
         if (onBatchLoaded == null) {
-            throw new IllegalArgumentException("Το onBatchLoaded δεν μπορεί να είναι null.");
+            throw new IllegalArgumentException("onBatchLoaded cannot be null.");
         }
 
         if (shouldContinue == null) {
-            throw new IllegalArgumentException("Το shouldContinue δεν μπορεί να είναι null.");
+            throw new IllegalArgumentException("shouldContinue cannot be null.");
         }
 
         YearRange yearRange = normalizeYearRange(startYear, endYear);
@@ -140,6 +145,7 @@ public class AuthorService {
         }
     }
 
+    // Gets author profile
     public Optional<AuthorProfileDto> getAuthorProfile(
             int authorId,
             Integer startYear,
@@ -156,6 +162,7 @@ public class AuthorService {
         );
     }
 
+    // Gets yearly stats
     public List<AuthorYearlyStatsDto> getAuthorYearlyStats(
             int authorId,
             Integer startYear,
@@ -172,6 +179,7 @@ public class AuthorService {
         );
     }
 
+    // Gets typed stats
     public List<AuthorYearlyStatsByTypeDto> getAuthorYearlyStatsByType(
             int authorId,
             Integer startYear,
@@ -188,6 +196,7 @@ public class AuthorService {
         );
     }
 
+    // Gets publications batch
     public List<AuthorPublicationDto> getAuthorPublicationsBatch(
             int authorId,
             Integer startYear,
@@ -211,6 +220,7 @@ public class AuthorService {
         );
     }
 
+    // Sorts author results
     private List<AuthorSearchResultDto> sortAuthorsByRelevance(
             List<AuthorSearchResultDto> results,
             String normalizedQuery
@@ -242,6 +252,7 @@ public class AuthorService {
         return sortedResults;
     }
 
+    // Scores author relevance
     private int authorRelevanceScore(AuthorSearchResultDto author, String query) {
         String name = normalizeSearchText(author == null ? null : author.authorName());
 
@@ -268,6 +279,7 @@ public class AuthorService {
         return 5;
     }
 
+    // Checks query words
     private boolean containsAllQueryWords(String text, String query) {
         if (query == null || query.isBlank()) {
             return true;
@@ -282,6 +294,7 @@ public class AuthorService {
         return true;
     }
 
+    // Normalizes search text
     private String normalizeSearchText(String searchText) {
         if (searchText == null) {
             return "";
@@ -297,6 +310,7 @@ public class AuthorService {
                 .trim();
     }
 
+    // Normalizes search limit
     private int normalizeSearchLimit(Integer limit) {
         if (limit == null || limit <= 0) {
             return DEFAULT_SEARCH_LIMIT;
@@ -305,29 +319,32 @@ public class AuthorService {
         return Math.min(limit, MAX_SEARCH_LIMIT);
     }
 
+    // Normalizes year range
     private YearRange normalizeYearRange(Integer startYear, Integer endYear) {
         int safeStartYear = startYear != null ? startYear : DEFAULT_START_YEAR;
         int safeEndYear = endYear != null ? endYear : DEFAULT_END_YEAR;
 
         if (safeStartYear > safeEndYear) {
-            throw new IllegalArgumentException("Το startYear δεν μπορεί να είναι μεγαλύτερο από το endYear.");
+            throw new IllegalArgumentException("startYear cannot be greater than endYear.");
         }
 
         return new YearRange(safeStartYear, safeEndYear);
     }
 
+    // Normalizes article id
     private int normalizeLastArticleId(Integer lastArticleId) {
         if (lastArticleId == null) {
             return DEFAULT_LAST_ARTICLE_ID;
         }
 
         if (lastArticleId < 0) {
-            throw new IllegalArgumentException("Το lastArticleId δεν μπορεί να είναι αρνητικό.");
+            throw new IllegalArgumentException("lastArticleId cannot be negative.");
         }
 
         return lastArticleId;
     }
 
+    // Normalizes batch size
     private int normalizeBatchSize(Integer batchSize) {
         if (batchSize == null || batchSize <= 0) {
             return DEFAULT_BATCH_SIZE;
@@ -336,9 +353,10 @@ public class AuthorService {
         return Math.min(batchSize, MAX_BATCH_SIZE);
     }
 
+    // Validates positive id
     private void validateId(int id, String fieldName) {
         if (id <= 0) {
-            throw new IllegalArgumentException("Το " + fieldName + " πρέπει να είναι θετικός αριθμός.");
+            throw new IllegalArgumentException(fieldName + " must be positive.");
         }
     }
 
@@ -353,10 +371,12 @@ public class AuthorService {
             List<AuthorYearlyStatsDto> yearlyStats,
             List<AuthorYearlyStatsByTypeDto> yearlyStatsByType
     ) {
+        // Checks profile exists
         public boolean hasProfile() {
             return profile != null;
         }
 
+        // Gets expected publications
         public long expectedPublicationCount() {
             if (profile == null || profile.totalArticles() == null) {
                 return 0L;

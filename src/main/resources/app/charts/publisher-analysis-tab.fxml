@@ -5,12 +5,13 @@
 <?import javafx.scene.chart.CategoryAxis?>
 <?import javafx.scene.chart.NumberAxis?>
 <?import javafx.scene.control.Button?>
-<?import javafx.scene.control.ComboBox?>
 <?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ListView?>
 <?import javafx.scene.control.ScrollPane?>
 <?import javafx.scene.control.TextField?>
 <?import javafx.scene.layout.FlowPane?>
 <?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.Region?>
 <?import javafx.scene.layout.StackPane?>
 <?import javafx.scene.layout.VBox?>
 
@@ -39,7 +40,7 @@
                     <Label text="Publisher Analysis"
                            styleClass="venue-hero-title"/>
 
-                    <Label text="Compare journal publishers and their journal counts per quartile Q1-Q4."
+                    <Label text="Search and compare up to 10 selected publishers through quartile distribution and total publication bar charts."
                            wrapText="true"
                            styleClass="venue-hero-subtitle"/>
                 </VBox>
@@ -49,42 +50,88 @@
                       maxWidth="1500">
 
                     <VBox spacing="5">
-                        <Label text="Publisher quartile analysis"
+                        <Label text="Select publishers"
                                styleClass="content-title"/>
 
-                        <Label text="Filter publishers or load the top publishers. The bar chart uses Q1-Q4 as separate series."
+                        <Label text="Search a publisher, add it to the selected list, and then load the analysis. You can compare up to 10 publishers."
                                wrapText="true"
                                styleClass="stat-muted"/>
+                    </VBox>
+
+                    <VBox spacing="0"
+                          styleClass="google-search-shell">
+
+                        <HBox spacing="10"
+                              alignment="CENTER_LEFT"
+                              styleClass="google-search-main-row">
+
+                            <Label text="⌕"
+                                   styleClass="google-search-icon"/>
+
+                            <TextField fx:id="publisherFilterField"
+                                       promptText="Search publisher"
+                                       HBox.hgrow="ALWAYS"
+                                       styleClass="google-search-input"/>
+
+                            <Button fx:id="addPublisherButton"
+                                    text="Add"
+                                    onAction="#addSelectedPublisher"
+                                    styleClass="google-search-button"/>
+
+                            <Button fx:id="clearPublisherAnalysisButton"
+                                    text="Clear"
+                                    onAction="#clearPublisherAnalysis"
+                                    styleClass="google-secondary-button"/>
+                        </HBox>
+
+                        <VBox fx:id="publisherResultsContainer"
+                              spacing="6"
+                              visible="false"
+                              managed="false"
+                              styleClass="google-suggestions-panel">
+
+                            <Label text="Suggested publishers"
+                                   styleClass="google-suggestions-header"/>
+
+                            <ListView fx:id="publisherResultsListView"
+                                      prefHeight="150"
+                                      minHeight="150"
+                                      maxHeight="150"
+                                      styleClass="google-suggestions-list"/>
+                        </VBox>
+                    </VBox>
+
+                    <VBox spacing="8">
+                        <Label text="Selected publishers"
+                               styleClass="venue-results-title"/>
+
+                        <ListView fx:id="selectedPublishersListView"
+                                  prefHeight="145"
+                                  minHeight="145"
+                                  maxHeight="145"
+                                  styleClass="venue-results-list"/>
                     </VBox>
 
                     <HBox spacing="12"
                           alignment="CENTER_LEFT"
                           styleClass="google-search-filters-row">
 
-                        <TextField fx:id="publisherFilterField"
-                                   promptText="Optional publisher filter"
-                                   HBox.hgrow="ALWAYS"
-                                   styleClass="form-control"/>
-
-                        <ComboBox fx:id="publisherLimitComboBox"
-                                  promptText="Top N"
-                                  prefWidth="140"
-                                  styleClass="form-control"/>
-
                         <Button fx:id="loadPublisherAnalysisButton"
                                 text="Load Publisher Analysis"
                                 onAction="#loadPublisherAnalysis"
                                 styleClass="primary-button"/>
 
-                        <Button fx:id="clearPublisherAnalysisButton"
-                                text="Clear"
-                                onAction="#clearPublisherAnalysis"
+                        <Button fx:id="removeSelectedPublisherButton"
+                                text="Remove Selected"
+                                onAction="#removeSelectedPublisher"
                                 styleClass="secondary-button"/>
-                    </HBox>
 
-                    <Label fx:id="publisherStatusLabel"
-                           text="Choose publisher filter or load top publishers."
-                           styleClass="hint-label"/>
+                        <Region HBox.hgrow="ALWAYS"/>
+
+                        <Label fx:id="publisherStatusLabel"
+                               text="Search for publishers, add up to 10, and load the analysis."
+                               styleClass="hint-label"/>
+                    </HBox>
                 </VBox>
 
                 <VBox spacing="16"
@@ -93,21 +140,24 @@
 
                     <HBox alignment="CENTER_LEFT">
                         <VBox spacing="4" HBox.hgrow="ALWAYS">
-                            <Label text="Publishers by Quartile"
+                            <Label text="Quartile Distribution"
                                    styleClass="content-title"/>
 
-                            <Label text="X-axis shows publishers. Y-axis shows journal count. The four series correspond to Q1, Q2, Q3 and Q4."
+                            <Label text="Each selected publisher is displayed on the X-axis. The four bar series correspond to Q1, Q2, Q3 and Q4 publication counts."
                                    wrapText="true"
                                    styleClass="stat-muted"/>
                         </VBox>
 
-                        <Label text="PUBLISHER BAR CHART"
+                        <Label text="BAR CHART"
                                styleClass="small-blue-chip"/>
                     </HBox>
 
                     <VBox spacing="8"
                           styleClass="chart-card"
                           maxWidth="1500">
+
+                        <Label text="Publication count per publisher and quartile"
+                               styleClass="chart-card-title"/>
 
                         <BarChart fx:id="publisherQuartileBarChart"
                                   prefHeight="560"
@@ -127,7 +177,7 @@
 
                             <yAxis>
                                 <NumberAxis fx:id="publisherCountAxis"
-                                            label="Journals count"
+                                            label="Publications count"
                                             forceZeroInRange="true"
                                             minorTickVisible="false"/>
                             </yAxis>
@@ -145,6 +195,76 @@
                                styleClass="chart-card-title"/>
 
                         <FlowPane fx:id="publisherLegendFlow"
+                                  hgap="10"
+                                  vgap="8"
+                                  prefWrapLength="1200"/>
+                    </VBox>
+                </VBox>
+
+                <VBox fx:id="publisherTotalChartBox"
+                      spacing="16"
+                      styleClass="dashboard-panel charts-dashboard"
+                      visible="false"
+                      managed="false"
+                      maxWidth="1500">
+
+                    <HBox alignment="CENTER_LEFT">
+                        <VBox spacing="4" HBox.hgrow="ALWAYS">
+                            <Label text="Total Publications Comparison"
+                                   styleClass="content-title"/>
+
+                            <Label text="This chart appears only when at least two publishers are selected."
+                                   wrapText="true"
+                                   styleClass="stat-muted"/>
+                        </VBox>
+
+                        <Label text="BAR CHART"
+                               styleClass="small-blue-chip"/>
+                    </HBox>
+
+                    <VBox spacing="8"
+                          styleClass="chart-card"
+                          maxWidth="1500">
+
+                        <Label text="Total publications per publisher"
+                               styleClass="chart-card-title"/>
+
+                        <BarChart fx:id="publisherTotalBarChart"
+                                  prefHeight="460"
+                                  minHeight="420"
+                                  animated="false"
+                                  legendVisible="false"
+                                  horizontalGridLinesVisible="true"
+                                  verticalGridLinesVisible="false"
+                                  alternativeRowFillVisible="false"
+                                  alternativeColumnFillVisible="false"
+                                  styleClass="beautiful-line-chart">
+
+                            <xAxis>
+                                <CategoryAxis fx:id="publisherTotalCategoryAxis"
+                                              label="Publisher"/>
+                            </xAxis>
+
+                            <yAxis>
+                                <NumberAxis fx:id="publisherTotalCountAxis"
+                                            label="Total publications"
+                                            forceZeroInRange="true"
+                                            minorTickVisible="false"/>
+                            </yAxis>
+                        </BarChart>
+                    </VBox>
+
+                    <VBox fx:id="publisherTotalLegendBox"
+                          spacing="8"
+                          styleClass="chart-card"
+                          visible="false"
+                          managed="false"
+                          maxWidth="1500">
+
+                        <Label text="Legend"
+                               styleClass="chart-card-title"/>
+
+                        <FlowPane fx:id="publisherTotalLegendFlow"
                                   hgap="10"
                                   vgap="8"
                                   prefWrapLength="1200"/>

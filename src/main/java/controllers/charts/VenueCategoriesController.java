@@ -15,31 +15,26 @@ import javafx.scene.control.Button;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
+import javafx.scene.control.ListView;
 import javafx.scene.control.Tooltip;
+import javafx.scene.input.KeyCode;
+import javafx.scene.input.KeyEvent;
 import javafx.scene.input.MouseButton;
 import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
-import service.ConferenceService;
-import service.JournalService;
+import service.charts.VenueCategoriesService;
 
-import java.lang.reflect.Field;
-import java.lang.reflect.Method;
-import java.time.LocalDate;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
-import java.util.Map;
-import java.util.TreeMap;
 
 public class VenueCategoriesController {
 
-    private static final String ANALYSIS_CONFERENCE_PRIMARY_FOR = "Conference PrimaryFoR";
-    private static final String ANALYSIS_JOURNAL_BEST_SUBJECT_AREA = "Journal BestSubjectArea";
+    private static final int MIN_YEAR = VenueCategoriesService.DEFAULT_MIN_YEAR;
 
-    private static final int MIN_YEAR = 1900;
-    private static final int MAX_VISIBLE_CATEGORIES = 12;
+    private static final String CATEGORY_ENTER_HANDLER_INSTALLED_KEY = "venue-categories-enter-handler-installed";
+    private static final long CATEGORY_ENTER_LOAD_DEBOUNCE_MILLIS = 300L;
 
     private static final String[] CHART_COLORS = {
             "#1f5fa8",
@@ -56,11 +51,12 @@ public class VenueCategoriesController {
             "#ad1457"
     };
 
-    private final JournalService journalService = new JournalService();
-    private final ConferenceService conferenceService = new ConferenceService();
+    private final VenueCategoriesService venueCategoriesService = new VenueCategoriesService();
 
     private Task<List<CategoryOptionDto>> categoryOptionsTask;
     private String activeCategoryKey;
+
+    private long lastCategoryEnterLoadTimeMillis = 0L;
 
     private final List<ChartHighlightHandle> chartHighlightHandles = new ArrayList<>();
     private final List<LegendHighlightHandle> legendHighlightHandles = new ArrayList<>();
@@ -121,30 +117,30 @@ public class VenueCategoriesController {
     private void loadCategoryTrends() {
         String analysisType = categoryTypeComboBox == null ? null : categoryTypeComboBox.getValue();
 
-        if (analysisType == null || analysisType.isBlank()) {
-            showError("Δεν επιλέχθηκε τύπος", "Πρέπει να επιλέξεις Conference PrimaryFoR ή Journal BestSubjectArea.");
+        try {
+            venueCategoriesService.validateAnalysisType(analysisType);
+        } catch (IllegalArgumentException exception) {
+            showError("No category type selected", exception.getMessage());
             return;
         }
 
-        YearRange yearRange;
+        VenueCategoriesService.YearRange yearRange;
 
         try {
             yearRange = getSelectedYearRange();
         } catch (IllegalArgumentException exception) {
-            showError("Λάθος χρονιές", exception.getMessage());
+            showError("Invalid year range", exception.getMessage());
             return;
         }
 
         String categoryFilter = getSelectedCategoryFilter();
-        String categoryLabel = getSelectedCategoryLabel();
 
-        Task<List<CategoryTrendSeries>> task = new Task<>() {
+        Task<List<VenueCategoriesService.CategoryTrendSeries>> task = new Task<>() {
             @Override
-            protected List<CategoryTrendSeries> call() {
-                return loadCategoryTrendData(
+            protected List<VenueCategoriesService.CategoryTrendSeries> call() {
+                return venueCategoriesService.loadCategoryTrendData(
                         analysisType,
                         categoryFilter,
-                        categoryLabel,
                         yearRange.startYear(),
                         yearRange.endYear()
                 );
@@ -157,14 +153,14 @@ public class VenueCategoriesController {
         task.setOnSucceeded(event -> {
             setLoading(false);
 
-            List<CategoryTrendSeries> data = task.getValue();
+            List<VenueCategoriesService.CategoryTrendSeries> data = task.getValue();
 
             if (data == null || data.isEmpty()) {
                 clearChartOnly();
-                setStatus("No category trend data found. Check if the trend query has been connected.");
+                setStatus("No category trend data found.");
                 showInfo(
-                        "Δεν βρέθηκαν δεδομένα",
-                        "Οι κατηγορίες φορτώνονται, αλλά χρειάζεται να συνδέσουμε και τα yearly trend queries."
+                        "No data found",
+                        "No yearly trend data was found for the selected filters."
                 );
                 return;
             }
@@ -177,7 +173,7 @@ public class VenueCategoriesController {
             setLoading(false);
             Throwable exception = task.getException();
             setStatus("Failed to load category trends.");
-            showError("Σφάλμα φόρτωσης", exception == null ? null : exception.getMessage());
+            showError("Loading error", exception == null ? null : exception.getMessage());
         });
 
         startBackgroundTask(task, "venue-categories-load-task");
@@ -207,12 +203,8 @@ public class VenueCategoriesController {
             return;
         }
 
-        categoryTypeComboBox.getItems().setAll(
-                ANALYSIS_CONFERENCE_PRIMARY_FOR,
-                ANALYSIS_JOURNAL_BEST_SUBJECT_AREA
-        );
-
-        categoryTypeComboBox.getSelectionModel().select(ANALYSIS_CONFERENCE_PRIMARY_FOR);
+        categoryTypeComboBox.getItems().setAll(venueCategoriesService.getAnalysisTypes());
+        categoryTypeComboBox.getSelectionModel().select(VenueCategoriesService.ANALYSIS_CONFERENCE_PRIMARY_FOR);
 
         categoryTypeComboBox.setOnAction(event -> {
             clearChartOnly();
@@ -225,17 +217,21 @@ public class VenueCategoriesController {
             return;
         }
 
-        categoryFilterComboBox.setCellFactory(listView -> new ListCell<>() {
-            @Override
-            protected void updateItem(CategoryOptionDto item, boolean empty) {
-                super.updateItem(item, empty);
+        categoryFilterComboBox.setCellFactory(listView -> {
+            installCategoryListEnterHandler(listView);
 
-                if (empty || item == null) {
-                    setText(null);
-                } else {
-                    setText(formatCategoryOptionForUi(item));
+            return new ListCell<>() {
+                @Override
+                protected void updateItem(CategoryOptionDto item, boolean empty) {
+                    super.updateItem(item, empty);
+
+                    if (empty || item == null) {
+                        setText(null);
+                    } else {
+                        setText(formatCategoryOptionForUi(item));
+                    }
                 }
-            }
+            };
         });
 
         categoryFilterComboBox.setButtonCell(new ListCell<>() {
@@ -251,7 +247,65 @@ public class VenueCategoriesController {
             }
         });
 
+        categoryFilterComboBox.addEventHandler(KeyEvent.KEY_RELEASED, event -> {
+            if (event.getCode() != KeyCode.ENTER) {
+                return;
+            }
+
+            event.consume();
+            loadSelectedCategoryFromEnter();
+        });
+
         setDefaultCategoryOptions();
+    }
+
+    private void installCategoryListEnterHandler(ListView<CategoryOptionDto> listView) {
+        if (listView == null) {
+            return;
+        }
+
+        Object alreadyInstalled = listView.getProperties().get(CATEGORY_ENTER_HANDLER_INSTALLED_KEY);
+
+        if (Boolean.TRUE.equals(alreadyInstalled)) {
+            return;
+        }
+
+        listView.getProperties().put(CATEGORY_ENTER_HANDLER_INSTALLED_KEY, Boolean.TRUE);
+
+        listView.addEventFilter(KeyEvent.KEY_PRESSED, event -> {
+            if (event.getCode() != KeyCode.ENTER) {
+                return;
+            }
+
+            CategoryOptionDto selectedItem = listView.getSelectionModel().getSelectedItem();
+
+            if (selectedItem != null && categoryFilterComboBox != null) {
+                categoryFilterComboBox.getSelectionModel().select(selectedItem);
+            }
+
+            event.consume();
+            loadSelectedCategoryFromEnter();
+        });
+    }
+
+    private void loadSelectedCategoryFromEnter() {
+        if (categoryFilterComboBox == null || categoryFilterComboBox.isDisabled()) {
+            return;
+        }
+
+        long now = System.currentTimeMillis();
+
+        if (now - lastCategoryEnterLoadTimeMillis < CATEGORY_ENTER_LOAD_DEBOUNCE_MILLIS) {
+            return;
+        }
+
+        lastCategoryEnterLoadTimeMillis = now;
+
+        if (categoryFilterComboBox.isShowing()) {
+            categoryFilterComboBox.hide();
+        }
+
+        Platform.runLater(this::loadCategoryTrends);
     }
 
     private void refreshCategoryFilterOptions() {
@@ -269,19 +323,17 @@ public class VenueCategoriesController {
         categoryFilterComboBox.setDisable(true);
         setStatus("Loading categories...");
 
-        categoryOptionsTask = new Task<>() {
+        Task<List<CategoryOptionDto>> task = new Task<>() {
             @Override
             protected List<CategoryOptionDto> call() {
-                if (ANALYSIS_CONFERENCE_PRIMARY_FOR.equals(selectedType)) {
-                    return conferenceService.getPrimaryFoRCategories();
-                }
-
-                return journalService.getBestSubjectAreas();
+                return venueCategoriesService.loadCategoryOptions(selectedType);
             }
         };
 
-        categoryOptionsTask.setOnSucceeded(event -> {
-            if (categoryOptionsTask.isCancelled()) {
+        categoryOptionsTask = task;
+
+        task.setOnSucceeded(event -> {
+            if (task.isCancelled()) {
                 return;
             }
 
@@ -293,32 +345,24 @@ public class VenueCategoriesController {
 
             categoryFilterComboBox.setDisable(false);
 
-            List<CategoryOptionDto> loadedCategories = categoryOptionsTask.getValue();
+            List<CategoryOptionDto> options = task.getValue();
 
-            List<CategoryOptionDto> options = new ArrayList<>();
-            options.add(new CategoryOptionDto("", "All categories"));
-
-            if (loadedCategories != null) {
-                options.addAll(loadedCategories);
+            if (options == null || options.isEmpty()) {
+                options = venueCategoriesService.buildDefaultCategoryOptions();
             }
 
             categoryFilterComboBox.getItems().setAll(options);
             categoryFilterComboBox.getSelectionModel().selectFirst();
-
-            if (ANALYSIS_CONFERENCE_PRIMARY_FOR.equals(selectedType)) {
-                categoryFilterComboBox.setPromptText("Select PrimaryFoR category");
-            } else {
-                categoryFilterComboBox.setPromptText("Select BestSubjectArea category");
-            }
+            categoryFilterComboBox.setPromptText(venueCategoriesService.getCategoryPromptText(selectedType));
 
             setStatus("Loaded " + Math.max(0, options.size() - 1) + " categories.");
         });
 
-        categoryOptionsTask.setOnFailed(event -> {
+        task.setOnFailed(event -> {
             categoryFilterComboBox.setDisable(false);
             setDefaultCategoryOptions();
 
-            Throwable exception = categoryOptionsTask.getException();
+            Throwable exception = task.getException();
 
             if (exception != null) {
                 exception.printStackTrace();
@@ -327,7 +371,7 @@ public class VenueCategoriesController {
             setStatus("Could not load categories from database.");
         });
 
-        startBackgroundTask(categoryOptionsTask, "venue-categories-options-task");
+        startBackgroundTask(task, "venue-categories-options-task");
     }
 
     private void setDefaultCategoryOptions() {
@@ -335,33 +379,16 @@ public class VenueCategoriesController {
             return;
         }
 
-        categoryFilterComboBox.getItems().setAll(
-                new CategoryOptionDto("", "All categories")
-        );
-
-        categoryFilterComboBox.getSelectionModel().selectFirst();
-
         String selectedType = categoryTypeComboBox == null ? null : categoryTypeComboBox.getValue();
 
-        if (ANALYSIS_CONFERENCE_PRIMARY_FOR.equals(selectedType)) {
-            categoryFilterComboBox.setPromptText("Select PrimaryFoR category");
-        } else {
-            categoryFilterComboBox.setPromptText("Select BestSubjectArea category");
-        }
+        categoryFilterComboBox.getItems().setAll(venueCategoriesService.buildDefaultCategoryOptions());
+        categoryFilterComboBox.getSelectionModel().selectFirst();
+        categoryFilterComboBox.setPromptText(venueCategoriesService.getCategoryPromptText(selectedType));
     }
 
     private String formatCategoryOptionForUi(CategoryOptionDto option) {
-        if (option == null) {
-            return "";
-        }
-
         String selectedType = categoryTypeComboBox == null ? null : categoryTypeComboBox.getValue();
-
-        if (ANALYSIS_JOURNAL_BEST_SUBJECT_AREA.equals(selectedType)) {
-            return option.name();
-        }
-
-        return option.displayText();
+        return venueCategoriesService.formatCategoryOptionForUi(option, selectedType);
     }
 
     private String getSelectedCategoryFilter() {
@@ -369,27 +396,7 @@ public class VenueCategoriesController {
             return "";
         }
 
-        CategoryOptionDto selected = categoryFilterComboBox.getValue();
-
-        if (selected == null || selected.id() == null || selected.id().isBlank()) {
-            return "";
-        }
-
-        return selected.id();
-    }
-
-    private String getSelectedCategoryLabel() {
-        if (categoryFilterComboBox == null) {
-            return "";
-        }
-
-        CategoryOptionDto selected = categoryFilterComboBox.getValue();
-
-        if (selected == null || selected.name() == null || selected.name().isBlank()) {
-            return "";
-        }
-
-        return selected.name();
+        return venueCategoriesService.getSelectedCategoryFilter(categoryFilterComboBox.getValue());
     }
 
     private void setupYearComboBoxes() {
@@ -409,20 +416,7 @@ public class VenueCategoriesController {
         }
 
         comboBox.setEditable(false);
-        comboBox.getItems().setAll(buildYearList(MIN_YEAR));
-    }
-
-    private List<Integer> buildYearList(int minimumYear) {
-        int currentYear = LocalDate.now().getYear();
-        int min = Math.max(MIN_YEAR, minimumYear);
-
-        List<Integer> years = new ArrayList<>();
-
-        for (int year = currentYear; year >= min; year--) {
-            years.add(Integer.valueOf(year));
-        }
-
-        return years;
+        comboBox.getItems().setAll(venueCategoriesService.buildYearList(MIN_YEAR));
     }
 
     private void refreshToYearOptions(Integer fromYear) {
@@ -431,9 +425,8 @@ public class VenueCategoriesController {
         }
 
         Integer currentToYear = categoryToYearComboBox.getValue();
-        int minimumYear = fromYear == null ? MIN_YEAR : fromYear.intValue();
 
-        categoryToYearComboBox.getItems().setAll(buildYearList(minimumYear));
+        categoryToYearComboBox.getItems().setAll(venueCategoriesService.buildYearList(fromYear));
 
         if (currentToYear != null && fromYear != null && currentToYear < fromYear) {
             categoryToYearComboBox.getSelectionModel().clearSelection();
@@ -468,271 +461,10 @@ public class VenueCategoriesController {
         }
     }
 
-    private List<CategoryTrendSeries> loadCategoryTrendData(
-            String analysisType,
-            String categoryFilter,
-            String categoryLabel,
-            Integer fromYear,
-            Integer toYear
+    private void updateCategoryTrendChart(
+            List<VenueCategoriesService.CategoryTrendSeries> allSeries,
+            String analysisType
     ) {
-        List<Object> rawRows;
-
-        if (ANALYSIS_CONFERENCE_PRIMARY_FOR.equals(analysisType)) {
-            rawRows = invokeTrendServiceMethod(
-                    conferenceService,
-                    List.of(
-                            "getConferencePrimaryFoRYearlyTrends",
-                            "getConferencePrimaryForYearlyTrends",
-                            "getConferenceCategoryYearlyTrends"
-                    ),
-                    categoryFilter,
-                    fromYear,
-                    toYear
-            );
-        } else if (ANALYSIS_JOURNAL_BEST_SUBJECT_AREA.equals(analysisType)) {
-            rawRows = invokeTrendServiceMethod(
-                    journalService,
-                    List.of(
-                            "getJournalBestSubjectAreaYearlyTrends",
-                            "getJournalSubjectAreaYearlyTrends",
-                            "getJournalCategoryYearlyTrends"
-                    ),
-                    categoryFilter,
-                    fromYear,
-                    toYear
-            );
-        } else {
-            rawRows = new ArrayList<>();
-        }
-
-        return convertRawRowsToSeries(rawRows, categoryFilter, categoryLabel);
-    }
-
-    private List<Object> invokeTrendServiceMethod(
-            Object service,
-            List<String> methodNames,
-            String categoryFilter,
-            Integer fromYear,
-            Integer toYear
-    ) {
-        if (service == null || methodNames == null || methodNames.isEmpty()) {
-            return new ArrayList<>();
-        }
-
-        for (String methodName : methodNames) {
-            List<Object> result;
-
-            result = tryInvokeServiceMethod(
-                    service,
-                    methodName,
-                    new Class<?>[]{String.class, Integer.class, Integer.class},
-                    new Object[]{categoryFilter, fromYear, toYear}
-            );
-
-            if (result != null) {
-                return result;
-            }
-
-            result = tryInvokeServiceMethod(
-                    service,
-                    methodName,
-                    new Class<?>[]{String.class, int.class, int.class},
-                    new Object[]{
-                            categoryFilter,
-                            fromYear == null ? MIN_YEAR : fromYear.intValue(),
-                            toYear == null ? LocalDate.now().getYear() : toYear.intValue()
-                    }
-            );
-
-            if (result != null) {
-                return result;
-            }
-
-            if (categoryFilter == null || categoryFilter.isBlank()) {
-                result = tryInvokeServiceMethod(
-                        service,
-                        methodName,
-                        new Class<?>[]{Integer.class, Integer.class},
-                        new Object[]{fromYear, toYear}
-                );
-
-                if (result != null) {
-                    return result;
-                }
-
-                result = tryInvokeServiceMethod(
-                        service,
-                        methodName,
-                        new Class<?>[]{int.class, int.class},
-                        new Object[]{
-                                fromYear == null ? MIN_YEAR : fromYear.intValue(),
-                                toYear == null ? LocalDate.now().getYear() : toYear.intValue()
-                        }
-                );
-
-                if (result != null) {
-                    return result;
-                }
-            }
-        }
-
-        return new ArrayList<>();
-    }
-
-    @SuppressWarnings("unchecked")
-    private List<Object> tryInvokeServiceMethod(
-            Object service,
-            String methodName,
-            Class<?>[] parameterTypes,
-            Object[] arguments
-    ) {
-        try {
-            Method method = service.getClass().getMethod(methodName, parameterTypes);
-            Object result = method.invoke(service, arguments);
-
-            if (result instanceof List<?> list) {
-                return new ArrayList<>((List<Object>) list);
-            }
-
-            return new ArrayList<>();
-
-        } catch (NoSuchMethodException exception) {
-            return null;
-        } catch (Exception exception) {
-            throw new RuntimeException("Could not execute service method: " + methodName, exception);
-        }
-    }
-
-    private List<CategoryTrendSeries> convertRawRowsToSeries(
-            List<Object> rawRows,
-            String categoryFilter,
-            String categoryLabel
-    ) {
-        if (rawRows == null || rawRows.isEmpty()) {
-            return new ArrayList<>();
-        }
-
-        Map<String, Map<Integer, Long>> grouped = new TreeMap<>();
-
-        for (Object row : rawRows) {
-            if (row == null) {
-                continue;
-            }
-
-            String category = readStringValue(
-                    row,
-                    List.of(
-                            "category",
-                            "categoryName",
-                            "category_name",
-                            "primaryFoR",
-                            "primaryFor",
-                            "primaryFoRName",
-                            "primaryForName",
-                            "primary_for",
-                            "primaryFoR_name",
-                            "primary_for_name",
-                            "bestSubjectArea",
-                            "bestSubjectAreaName",
-                            "best_subject_area",
-                            "best_subject_area_name",
-                            "subjectArea",
-                            "subjectAreaName",
-                            "subject_area",
-                            "subject_area_name",
-                            "name",
-                            "label"
-                    )
-            );
-
-            Integer year = readIntegerValue(
-                    row,
-                    List.of(
-                            "year",
-                            "publicationYear",
-                            "publication_year"
-                    )
-            );
-
-            Long count = readLongValue(
-                    row,
-                    List.of(
-                            "count",
-                            "venueCount",
-                            "venue_count",
-                            "totalVenues",
-                            "total_venues",
-                            "total",
-                            "value"
-                    )
-            );
-
-            if ((category == null || category.isBlank())
-                    && categoryLabel != null
-                    && !categoryLabel.isBlank()) {
-                category = categoryLabel;
-            }
-
-            if ((category == null || category.isBlank())
-                    && categoryFilter != null
-                    && !categoryFilter.isBlank()) {
-                category = categoryFilter;
-            }
-
-            if (category == null || category.isBlank() || year == null || count == null) {
-                continue;
-            }
-
-            grouped
-                    .computeIfAbsent(category, key -> new TreeMap<>())
-                    .merge(year, count, Long::sum);
-        }
-
-        List<CategoryTrendSeries> series = new ArrayList<>();
-
-        for (Map.Entry<String, Map<Integer, Long>> entry : grouped.entrySet()) {
-            List<CategoryTrendPoint> points = new ArrayList<>();
-            long totalCount = 0;
-
-            for (Map.Entry<Integer, Long> pointEntry : entry.getValue().entrySet()) {
-                long count = pointEntry.getValue() == null ? 0 : pointEntry.getValue();
-
-                points.add(
-                        new CategoryTrendPoint(
-                                entry.getKey(),
-                                pointEntry.getKey().intValue(),
-                                count
-                        )
-                );
-
-                totalCount += count;
-            }
-
-            if (!points.isEmpty()) {
-                series.add(
-                        new CategoryTrendSeries(
-                                entry.getKey(),
-                                points,
-                                totalCount
-                        )
-                );
-            }
-        }
-
-        series.sort(
-                Comparator.comparingLong(CategoryTrendSeries::totalCount)
-                        .reversed()
-                        .thenComparing(CategoryTrendSeries::category)
-        );
-
-        if (series.size() > MAX_VISIBLE_CATEGORIES) {
-            return new ArrayList<>(series.subList(0, MAX_VISIBLE_CATEGORIES));
-        }
-
-        return series;
-    }
-
-    private void updateCategoryTrendChart(List<CategoryTrendSeries> allSeries, String analysisType) {
         clearChartOnly();
 
         if (allSeries == null || allSeries.isEmpty()) {
@@ -745,17 +477,17 @@ public class VenueCategoriesController {
 
         int seriesIndex = 0;
 
-        for (CategoryTrendSeries categorySeries : allSeries) {
+        for (VenueCategoriesService.CategoryTrendSeries categorySeries : allSeries) {
             XYChart.Series<Number, Number> chartSeries = new XYChart.Series<>();
             chartSeries.setName(shortenName(categorySeries.category()));
 
-            for (CategoryTrendPoint point : categorySeries.points()) {
-                minYear = minYear == null ? Integer.valueOf(point.year()) : Integer.valueOf(Math.min(minYear, point.year()));
-                maxYear = maxYear == null ? Integer.valueOf(point.year()) : Integer.valueOf(Math.max(maxYear, point.year()));
+            for (VenueCategoriesService.CategoryTrendPoint point : categorySeries.points()) {
+                minYear = minYear == null ? point.year() : Math.min(minYear, point.year());
+                maxYear = maxYear == null ? point.year() : Math.max(maxYear, point.year());
                 maxValue = Math.max(maxValue, point.count());
 
                 XYChart.Data<Number, Number> dataPoint =
-                        new XYChart.Data<>(Integer.valueOf(point.year()), Long.valueOf(point.count()));
+                        new XYChart.Data<>(point.year(), point.count());
 
                 dataPoint.setExtraValue(point.category());
                 chartSeries.getData().add(dataPoint);
@@ -765,7 +497,7 @@ public class VenueCategoriesController {
                 categoryTrendLineChart.getData().add(chartSeries);
 
                 final int colorIndex = seriesIndex;
-                final CategoryTrendSeries currentSeries = categorySeries;
+                final VenueCategoriesService.CategoryTrendSeries currentSeries = categorySeries;
 
                 runAfterChartRender(() -> applyLineSeriesColor(chartSeries, colorIndex, currentSeries));
             }
@@ -781,11 +513,7 @@ public class VenueCategoriesController {
         }
 
         if (categoryTrendLineChart != null) {
-            if (ANALYSIS_CONFERENCE_PRIMARY_FOR.equals(analysisType)) {
-                categoryTrendLineChart.setTitle("Conference categories by PrimaryFoR over years");
-            } else {
-                categoryTrendLineChart.setTitle("Journal categories by BestSubjectArea over years");
-            }
+            categoryTrendLineChart.setTitle(venueCategoriesService.getChartTitle(analysisType));
         }
 
         updateCustomLegend(allSeries);
@@ -801,7 +529,7 @@ public class VenueCategoriesController {
             categoryTrendLineChart.setTitle("");
         }
 
-        configureYearAxis(categoryYearAxis, Integer.valueOf(MIN_YEAR), Integer.valueOf(LocalDate.now().getYear()));
+        configureYearAxis(categoryYearAxis, MIN_YEAR, venueCategoriesService.getCurrentYear());
         configureValueAxis(categoryCountAxis, 10);
 
         updateCustomLegend(null);
@@ -817,8 +545,8 @@ public class VenueCategoriesController {
             return;
         }
 
-        int lowerYear = minYear.intValue();
-        int upperYear = maxYear.intValue();
+        int lowerYear = minYear;
+        int upperYear = maxYear;
 
         if (lowerYear == upperYear) {
             lowerYear = lowerYear - 1;
@@ -915,14 +643,14 @@ public class VenueCategoriesController {
     private void applyLineSeriesColor(
             XYChart.Series<Number, Number> series,
             int colorIndex,
-            CategoryTrendSeries categorySeries
+            VenueCategoriesService.CategoryTrendSeries categorySeries
     ) {
         if (series == null || categorySeries == null) {
             return;
         }
 
         String color = getChartColor(colorIndex);
-        String categoryKey = getCategoryKey(categorySeries);
+        String categoryKey = venueCategoriesService.getCategoryKey(categorySeries);
 
         Runnable normalStyle = () -> {
             Node line = series.getNode();
@@ -1035,7 +763,7 @@ public class VenueCategoriesController {
         }
     }
 
-    private void updateCustomLegend(List<CategoryTrendSeries> allSeries) {
+    private void updateCustomLegend(List<VenueCategoriesService.CategoryTrendSeries> allSeries) {
         legendHighlightHandles.clear();
 
         if (categoryLegendBox == null || categoryLegendFlow == null) {
@@ -1052,9 +780,9 @@ public class VenueCategoriesController {
 
         int index = 0;
 
-        for (CategoryTrendSeries categorySeries : allSeries) {
+        for (VenueCategoriesService.CategoryTrendSeries categorySeries : allSeries) {
             String color = getChartColor(index);
-            String categoryKey = getCategoryKey(categorySeries);
+            String categoryKey = venueCategoriesService.getCategoryKey(categorySeries);
 
             Region colorDot = new Region();
             colorDot.setMinSize(10, 10);
@@ -1205,14 +933,6 @@ public class VenueCategoriesController {
         return CHART_COLORS[index % CHART_COLORS.length];
     }
 
-    private String getCategoryKey(CategoryTrendSeries categorySeries) {
-        if (categorySeries == null || categorySeries.category() == null) {
-            return "";
-        }
-
-        return categorySeries.category();
-    }
-
     private String shortenName(String name) {
         if (name == null || name.isBlank()) {
             return "-";
@@ -1225,112 +945,11 @@ public class VenueCategoriesController {
         return name.substring(0, 39) + "...";
     }
 
-    private YearRange getSelectedYearRange() {
+    private VenueCategoriesService.YearRange getSelectedYearRange() {
         Integer startYear = categoryFromYearComboBox == null ? null : categoryFromYearComboBox.getValue();
         Integer endYear = categoryToYearComboBox == null ? null : categoryToYearComboBox.getValue();
 
-        if (startYear != null && endYear != null && endYear < startYear) {
-            throw new IllegalArgumentException("Το To year πρέπει να είναι μεγαλύτερο ή ίσο από το From year.");
-        }
-
-        return new YearRange(startYear, endYear);
-    }
-
-    private String readStringValue(Object row, List<String> names) {
-        Object value = readValue(row, names);
-
-        if (value == null) {
-            return null;
-        }
-
-        return String.valueOf(value).trim();
-    }
-
-    private Integer readIntegerValue(Object row, List<String> names) {
-        Object value = readValue(row, names);
-
-        if (value == null) {
-            return null;
-        }
-
-        if (value instanceof Number number) {
-            return Integer.valueOf(number.intValue());
-        }
-
-        try {
-            return Integer.valueOf(Integer.parseInt(String.valueOf(value).trim()));
-        } catch (NumberFormatException exception) {
-            return null;
-        }
-    }
-
-    private Long readLongValue(Object row, List<String> names) {
-        Object value = readValue(row, names);
-
-        if (value == null) {
-            return null;
-        }
-
-        if (value instanceof Number number) {
-            return Long.valueOf(number.longValue());
-        }
-
-        try {
-            return Long.valueOf(Math.round(Double.parseDouble(String.valueOf(value).trim())));
-        } catch (NumberFormatException exception) {
-            return null;
-        }
-    }
-
-    private Object readValue(Object row, List<String> names) {
-        for (String name : names) {
-            Object value = tryReadMethod(row, name);
-
-            if (value != null) {
-                return value;
-            }
-
-            value = tryReadMethod(row, "get" + capitalize(name));
-
-            if (value != null) {
-                return value;
-            }
-
-            value = tryReadField(row, name);
-
-            if (value != null) {
-                return value;
-            }
-        }
-
-        return null;
-    }
-
-    private Object tryReadMethod(Object row, String methodName) {
-        try {
-            Method method = row.getClass().getMethod(methodName);
-            return method.invoke(row);
-        } catch (Exception exception) {
-            return null;
-        }
-    }
-
-    private Object tryReadField(Object row, String fieldName) {
-        try {
-            Field field = row.getClass().getDeclaredField(fieldName);
-            field.setAccessible(true);
-            return field.get(row);
-        } catch (Exception exception) {
-            return null;
-        }
-    }
-
-    private String capitalize(String text) {
-        if (text == null || text.isBlank()) {
-            return "";
-        }
-
-        return text.substring(0, 1).toUpperCase() + text.substring(1);
+        return venueCategoriesService.validateYearRange(startYear, endYear);
     }
 
     private void setLoading(boolean loading) {
@@ -1383,7 +1002,7 @@ public class VenueCategoriesController {
         Alert alert = new Alert(Alert.AlertType.ERROR);
         alert.setTitle(title);
         alert.setHeaderText(title);
-        alert.setContentText(message == null || message.isBlank() ? "Άγνωστο σφάλμα." : message);
+        alert.setContentText(message == null || message.isBlank() ? "Unknown error." : message);
         alert.showAndWait();
     }
 
@@ -1393,20 +1012,6 @@ public class VenueCategoriesController {
         alert.setHeaderText(title);
         alert.setContentText(message == null || message.isBlank() ? "-" : message);
         alert.showAndWait();
-    }
-
-    private record CategoryTrendPoint(
-            String category,
-            int year,
-            long count
-    ) {
-    }
-
-    private record CategoryTrendSeries(
-            String category,
-            List<CategoryTrendPoint> points,
-            long totalCount
-    ) {
     }
 
     private record ChartHighlightHandle(
@@ -1422,12 +1027,6 @@ public class VenueCategoriesController {
             Region colorDot,
             Label nameLabel,
             String color
-    ) {
-    }
-
-    private record YearRange(
-            Integer startYear,
-            Integer endYear
     ) {
     }
 }

@@ -11,6 +11,7 @@ import java.util.Objects;
 
 public class HelloApplication extends Application {
 
+    // Starts application
     @Override
     public void start(Stage stage) throws Exception {
         DatabaseManager.initialize();
@@ -37,11 +38,13 @@ public class HelloApplication extends Application {
         stage.show();
     }
 
+    // Stops application
     @Override
     public void stop() {
         DatabaseManager.shutdown();
     }
 
+    // Launches program
     public static void main(String[] args) {
         launch(args);
     }

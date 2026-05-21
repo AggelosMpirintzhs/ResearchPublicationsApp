@@ -1,13 +1,18 @@
 package repository;
 
 import db.DatabaseManager;
+import dto.chart.CategoryOptionDto;
+import dto.chart.CategoryTrendDto;
+import dto.chart.PublisherOptionDto;
+import dto.chart.PublisherQuartileStatsDto;
+import dto.chart.ScatterPlotPointDto;
 import dto.journal.JournalArticleDto;
 import dto.journal.JournalProfileDto;
 import dto.journal.JournalRankingDto;
 import dto.journal.JournalSearchResultDto;
 import dto.journal.JournalYearlyStatsDto;
 import util.SqlFileLoader;
-import dto.chart.CategoryOptionDto;
+
 import java.sql.Connection;
 import java.sql.Date;
 import java.sql.PreparedStatement;
@@ -16,9 +21,81 @@ import java.sql.SQLException;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 public class JournalRepository {
+
+    private static final int MAX_RANKING_SCATTER_LIMIT = 1000;
+
+    private static final Map<String, String> RANKING_METRIC_COLUMNS = Map.ofEntries(
+            Map.entry("Total Docs", "total_docs"),
+            Map.entry("Total Docs 3y", "total_docs_3y"),
+            Map.entry("Total Refs", "total_refs"),
+            Map.entry("Total Cites 3y", "total_cites_3y"),
+            Map.entry("Citable Docs 3y", "citable_docs_3y"),
+            Map.entry("Cites / Doc 2y", "cites_per_doc_2y"),
+            Map.entry("Refs / Doc", "refs_per_doc"),
+            Map.entry("SJR", "sjr_index"),
+            Map.entry("Cite Score", "cite_score"),
+            Map.entry("H index", "h_index")
+    );
+
+    public List<ScatterPlotPointDto> findJournalRankingScatterData(
+            String xMetric,
+            String yMetric,
+            Integer limit
+    ) {
+        String xColumn = RANKING_METRIC_COLUMNS.get(xMetric);
+        String yColumn = RANKING_METRIC_COLUMNS.get(yMetric);
+
+        if (xColumn == null || yColumn == null) {
+            throw new IllegalArgumentException("Unknown ranking metric.");
+        }
+
+        boolean useLimit = limit != null && limit > 0;
+        int safeLimit = useLimit ? normalizeRankingScatterLimit(limit) : 0;
+        String limitClause = useLimit ? "LIMIT ?" : "";
+
+        String sqlTemplate = SqlFileLoader.load("sql/journal/journal_ranking_scatter.sql");
+
+        String sql = sqlTemplate.formatted(
+                xColumn,
+                yColumn,
+                xColumn,
+                yColumn,
+                xColumn,
+                yColumn,
+                limitClause
+        );
+
+        try (
+                Connection connection = DatabaseManager.getConnection();
+                PreparedStatement statement = connection.prepareStatement(sql)
+        ) {
+            if (useLimit) {
+                statement.setInt(1, safeLimit);
+            }
+
+            try (ResultSet rs = statement.executeQuery()) {
+                List<ScatterPlotPointDto> results = new ArrayList<>();
+
+                while (rs.next()) {
+                    results.add(new ScatterPlotPointDto(
+                            getInteger(rs, "id"),
+                            rs.getString("label"),
+                            getDouble(rs, "x_value"),
+                            getDouble(rs, "y_value")
+                    ));
+                }
+
+                return results;
+            }
+
+        } catch (SQLException exception) {
+            throw new RuntimeException("Failed to load journal ranking scatter data.", exception);
+        }
+    }
 
     public List<JournalSearchResultDto> searchJournals(String searchText, int limit) {
         String sql = SqlFileLoader.load("sql/journal/search_journals.sql");
@@ -41,7 +118,7 @@ public class JournalRepository {
             }
 
         } catch (SQLException exception) {
-            throw new RuntimeException("Αποτυχία αναζήτησης περιοδικών.", exception);
+            throw new RuntimeException("Failed to search journals.", exception);
         }
     }
 
@@ -69,7 +146,7 @@ public class JournalRepository {
             }
 
         } catch (SQLException exception) {
-            throw new RuntimeException("Αποτυχία φόρτωσης προφίλ περιοδικού.", exception);
+            throw new RuntimeException("Failed to load journal profile.", exception);
         }
     }
 
@@ -99,7 +176,7 @@ public class JournalRepository {
             }
 
         } catch (SQLException exception) {
-            throw new RuntimeException("Αποτυχία φόρτωσης yearly stats περιοδικού.", exception);
+            throw new RuntimeException("Failed to load journal yearly stats.", exception);
         }
     }
 
@@ -121,7 +198,7 @@ public class JournalRepository {
             }
 
         } catch (SQLException exception) {
-            throw new RuntimeException("Αποτυχία φόρτωσης ranking περιοδικού.", exception);
+            throw new RuntimeException("Failed to load journal ranking.", exception);
         }
     }
 
@@ -151,7 +228,7 @@ public class JournalRepository {
             }
 
         } catch (SQLException exception) {
-            throw new RuntimeException("Αποτυχία φόρτωσης άρθρων περιοδικού.", exception);
+            throw new RuntimeException("Failed to load journal articles.", exception);
         }
     }
 
@@ -185,7 +262,7 @@ public class JournalRepository {
             }
 
         } catch (SQLException exception) {
-            throw new RuntimeException("Αποτυχία φόρτωσης batch άρθρων περιοδικού.", exception);
+            throw new RuntimeException("Failed to load journal article batch.", exception);
         }
     }
 
@@ -211,8 +288,115 @@ public class JournalRepository {
             return results;
 
         } catch (SQLException exception) {
-            throw new RuntimeException("Αποτυχία φόρτωσης BestSubjectArea κατηγοριών.", exception);
+            throw new RuntimeException("Failed to load BestSubjectArea categories.", exception);
         }
+    }
+
+    public List<CategoryTrendDto> findJournalBestSubjectAreaYearlyTrends(
+            String categoryFilter,
+            int startYear,
+            int endYear
+    ) {
+        String sql = SqlFileLoader.load("sql/journal/journal_best_subject_area_yearly_trends.sql");
+        String safeCategoryFilter = categoryFilter == null ? "" : categoryFilter.trim();
+
+        try (
+                Connection connection = DatabaseManager.getConnection();
+                PreparedStatement statement = connection.prepareStatement(sql)
+        ) {
+            statement.setString(1, safeCategoryFilter);
+            statement.setString(2, safeCategoryFilter);
+            statement.setInt(3, startYear);
+            statement.setInt(4, endYear);
+
+            try (ResultSet rs = statement.executeQuery()) {
+                List<CategoryTrendDto> results = new ArrayList<>();
+
+                while (rs.next()) {
+                    results.add(mapCategoryTrend(rs));
+                }
+
+                return results;
+            }
+
+        } catch (SQLException exception) {
+            throw new RuntimeException("Failed to load BestSubjectArea yearly trends.", exception);
+        }
+    }
+
+    public List<PublisherOptionDto> getPublisherOptions(
+            String publisherFilter,
+            int limit
+    ) {
+        String sql = SqlFileLoader.load("sql/journal/publisher_options.sql");
+
+        String safePublisherFilter = publisherFilter == null ? "" : publisherFilter.trim();
+        int safeLimit = limit <= 0 ? 20 : limit;
+
+        try (
+                Connection connection = DatabaseManager.getConnection();
+                PreparedStatement statement = connection.prepareStatement(sql)
+        ) {
+            statement.setString(1, safePublisherFilter);
+            statement.setString(2, safePublisherFilter);
+            statement.setString(3, safePublisherFilter);
+            statement.setInt(4, safeLimit);
+
+            try (ResultSet rs = statement.executeQuery()) {
+                List<PublisherOptionDto> results = new ArrayList<>();
+
+                while (rs.next()) {
+                    results.add(mapPublisherOption(rs));
+                }
+
+                return results;
+            }
+
+        } catch (SQLException exception) {
+            throw new RuntimeException("Failed to load publisher options.", exception);
+        }
+    }
+
+    public List<PublisherQuartileStatsDto> getPublisherQuartilePublicationStatsById(int publisherId) {
+        String sql = SqlFileLoader.load("sql/journal/publisher_quartile_publication_stats_by_id.sql");
+
+        try (
+                Connection connection = DatabaseManager.getConnection();
+                PreparedStatement statement = connection.prepareStatement(sql)
+        ) {
+            statement.setInt(1, publisherId);
+
+            try (ResultSet rs = statement.executeQuery()) {
+                List<PublisherQuartileStatsDto> results = new ArrayList<>();
+
+                while (rs.next()) {
+                    results.add(mapPublisherQuartileStats(rs));
+                }
+
+                return results;
+            }
+
+        } catch (SQLException exception) {
+            throw new RuntimeException("Failed to load publisher quartile publication stats.", exception);
+        }
+    }
+
+    public List<PublisherQuartileStatsDto> getPublisherQuartileStats(
+            String publisherFilter,
+            int limit
+    ) {
+        List<PublisherOptionDto> publisherOptions = getPublisherOptions(publisherFilter, limit);
+        List<PublisherQuartileStatsDto> results = new ArrayList<>();
+
+        for (PublisherOptionDto publisherOption : publisherOptions) {
+            results.addAll(getPublisherQuartilePublicationStatsById(publisherOption.publisherId()));
+        }
+
+        return results;
+    }
+
+    private int normalizeRankingScatterLimit(Integer limit) {
+        return Math.min(limit, MAX_RANKING_SCATTER_LIMIT);
     }
 
     private JournalSearchResultDto mapJournalSearchResult(ResultSet rs) throws SQLException {
@@ -305,6 +489,32 @@ public class JournalRepository {
 
                 getLong(rs, "author_count"),
                 rs.getString("authors")
+        );
+    }
+
+    private CategoryTrendDto mapCategoryTrend(ResultSet rs) throws SQLException {
+        return new CategoryTrendDto(
+                rs.getString("category"),
+                rs.getInt("year"),
+                rs.getLong("count")
+        );
+    }
+
+    private PublisherOptionDto mapPublisherOption(ResultSet rs) throws SQLException {
+        return new PublisherOptionDto(
+                rs.getInt("publisher_id"),
+                rs.getString("publisher_name"),
+                rs.getLong("total_publications")
+        );
+    }
+
+    private PublisherQuartileStatsDto mapPublisherQuartileStats(ResultSet rs) throws SQLException {
+        return new PublisherQuartileStatsDto(
+                rs.getInt("publisher_id"),
+                rs.getString("publisher_name"),
+                rs.getString("quartile"),
+                rs.getLong("publication_count"),
+                rs.getLong("total_publications")
         );
     }
 
