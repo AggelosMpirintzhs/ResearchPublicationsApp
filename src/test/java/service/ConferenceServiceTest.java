@@ -1,5 +1,7 @@
 package service;
 
+import dto.chart.CategoryOptionDto;
+import dto.chart.CategoryTrendDto;
 import dto.conference.ConferenceArticleDto;
 import dto.conference.ConferenceProfileDto;
 import dto.conference.ConferenceRankingDto;
@@ -547,5 +549,87 @@ class ConferenceServiceTest {
         }
 
         return result;
+    }
+
+    @Test
+    void getPrimaryFoRCategories_returnsExpectedCategories() {
+        CategoryOptionDto category1 = mock(CategoryOptionDto.class);
+        CategoryOptionDto category2 = mock(CategoryOptionDto.class);
+
+        List<CategoryOptionDto> expectedCategories = List.of(category1, category2);
+
+        when(conferenceRepository.findPrimaryFoRCategories())
+                .thenReturn(expectedCategories);
+
+        List<CategoryOptionDto> result =
+                conferenceService.getPrimaryFoRCategories();
+
+        assertEquals(expectedCategories, result);
+        assertSame(category1, result.get(0));
+        assertSame(category2, result.get(1));
+
+        verify(conferenceRepository).findPrimaryFoRCategories();
+        verifyNoMoreInteractions(conferenceRepository);
+    }
+
+    @Test
+    void getConferencePrimaryFoRYearlyTrends_trimsCategoryFilterAndReturnsExpectedTrends() {
+        CategoryTrendDto trend1 = mock(CategoryTrendDto.class);
+        CategoryTrendDto trend2 = mock(CategoryTrendDto.class);
+
+        List<CategoryTrendDto> expectedTrends = List.of(trend1, trend2);
+
+        when(conferenceRepository.findConferencePrimaryFoRYearlyTrends("Computer Science", 2010, 2020))
+                .thenReturn(expectedTrends);
+
+        List<CategoryTrendDto> result =
+                conferenceService.getConferencePrimaryFoRYearlyTrends(
+                        "   Computer Science   ",
+                        integer(2010),
+                        integer(2020)
+                );
+
+        assertEquals(expectedTrends, result);
+        assertSame(trend1, result.get(0));
+        assertSame(trend2, result.get(1));
+
+        verify(conferenceRepository).findConferencePrimaryFoRYearlyTrends("Computer Science", 2010, 2020);
+        verifyNoMoreInteractions(conferenceRepository);
+    }
+
+    @Test
+    void getConferencePrimaryFoRYearlyTrends_usesEmptyCategoryAndDefaultYears_whenValuesAreNull() {
+        CategoryTrendDto trend = mock(CategoryTrendDto.class);
+
+        when(conferenceRepository.findConferencePrimaryFoRYearlyTrends("", 0, 9999))
+                .thenReturn(List.of(trend));
+
+        List<CategoryTrendDto> result =
+                conferenceService.getConferencePrimaryFoRYearlyTrends(null, null, null);
+
+        assertEquals(1, result.size());
+        assertSame(trend, result.get(0));
+
+        verify(conferenceRepository).findConferencePrimaryFoRYearlyTrends("", 0, 9999);
+        verifyNoMoreInteractions(conferenceRepository);
+    }
+
+    @Test
+    void getConferenceYearlyStats_usesDefaultYearRange_whenYearsAreNull() {
+        int conferenceId = 8;
+
+        ConferenceYearlyStatsDto stats = mock(ConferenceYearlyStatsDto.class);
+
+        when(conferenceRepository.findConferenceYearlyStats(conferenceId, 0, 9999))
+                .thenReturn(List.of(stats));
+
+        List<ConferenceYearlyStatsDto> result =
+                conferenceService.getConferenceYearlyStats(conferenceId, null, null);
+
+        assertEquals(1, result.size());
+        assertSame(stats, result.get(0));
+
+        verify(conferenceRepository).findConferenceYearlyStats(conferenceId, 0, 9999);
+        verifyNoMoreInteractions(conferenceRepository);
     }
 }

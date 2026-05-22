@@ -13,6 +13,11 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import repository.JournalRepository;
+import dto.chart.CategoryOptionDto;
+import dto.chart.CategoryTrendDto;
+import dto.chart.PublisherOptionDto;
+import dto.chart.PublisherQuartileStatsDto;
+import dto.chart.ScatterPlotPointDto;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -547,5 +552,332 @@ class JournalServiceTest {
         }
 
         return result;
+    }
+
+    @Test
+    void getBestSubjectAreas_returnsExpectedCategories() {
+        CategoryOptionDto category1 = mock(CategoryOptionDto.class);
+        CategoryOptionDto category2 = mock(CategoryOptionDto.class);
+
+        List<CategoryOptionDto> expectedCategories = List.of(category1, category2);
+
+        when(journalRepository.findBestSubjectAreas())
+                .thenReturn(expectedCategories);
+
+        List<CategoryOptionDto> result =
+                journalService.getBestSubjectAreas();
+
+        assertEquals(expectedCategories, result);
+        assertSame(category1, result.get(0));
+        assertSame(category2, result.get(1));
+
+        verify(journalRepository).findBestSubjectAreas();
+        verifyNoMoreInteractions(journalRepository);
+    }
+
+    @Test
+    void getJournalBestSubjectAreaYearlyTrends_trimsCategoryFilterAndReturnsExpectedTrends() {
+        CategoryTrendDto trend1 = mock(CategoryTrendDto.class);
+        CategoryTrendDto trend2 = mock(CategoryTrendDto.class);
+
+        List<CategoryTrendDto> expectedTrends = List.of(trend1, trend2);
+
+        when(journalRepository.findJournalBestSubjectAreaYearlyTrends("Computer Science", 2010, 2020))
+                .thenReturn(expectedTrends);
+
+        List<CategoryTrendDto> result =
+                journalService.getJournalBestSubjectAreaYearlyTrends(
+                        "   Computer Science   ",
+                        integer(2010),
+                        integer(2020)
+                );
+
+        assertEquals(expectedTrends, result);
+        assertSame(trend1, result.get(0));
+        assertSame(trend2, result.get(1));
+
+        verify(journalRepository).findJournalBestSubjectAreaYearlyTrends("Computer Science", 2010, 2020);
+        verifyNoMoreInteractions(journalRepository);
+    }
+
+    @Test
+    void getJournalBestSubjectAreaYearlyTrends_usesEmptyCategoryAndDefaultYears_whenValuesAreNull() {
+        CategoryTrendDto trend = mock(CategoryTrendDto.class);
+
+        when(journalRepository.findJournalBestSubjectAreaYearlyTrends("", 0, 9999))
+                .thenReturn(List.of(trend));
+
+        List<CategoryTrendDto> result =
+                journalService.getJournalBestSubjectAreaYearlyTrends(null, null, null);
+
+        assertEquals(1, result.size());
+        assertSame(trend, result.get(0));
+
+        verify(journalRepository).findJournalBestSubjectAreaYearlyTrends("", 0, 9999);
+        verifyNoMoreInteractions(journalRepository);
+    }
+
+    @Test
+    void getPublisherOptions_returnsEmptyListAndDoesNotCallRepository_whenPublisherFilterIsBlank() {
+        List<PublisherOptionDto> result =
+                journalService.getPublisherOptions("   ", integer(10));
+
+        assertNotNull(result);
+        assertTrue(result.isEmpty());
+
+        verifyNoInteractions(journalRepository);
+    }
+
+    @Test
+    void getPublisherOptions_returnsEmptyListAndDoesNotCallRepository_whenPublisherFilterIsNull() {
+        List<PublisherOptionDto> result =
+                journalService.getPublisherOptions(null, integer(10));
+
+        assertNotNull(result);
+        assertTrue(result.isEmpty());
+
+        verifyNoInteractions(journalRepository);
+    }
+
+    @Test
+    void getPublisherOptions_trimsPublisherFilterAndReturnsExpectedOptions() {
+        PublisherOptionDto publisher1 = mock(PublisherOptionDto.class);
+        PublisherOptionDto publisher2 = mock(PublisherOptionDto.class);
+
+        List<PublisherOptionDto> expectedPublishers = List.of(publisher1, publisher2);
+
+        when(journalRepository.getPublisherOptions("Elsevier", 10))
+                .thenReturn(expectedPublishers);
+
+        List<PublisherOptionDto> result =
+                journalService.getPublisherOptions("   Elsevier   ", integer(10));
+
+        assertEquals(expectedPublishers, result);
+        assertSame(publisher1, result.get(0));
+        assertSame(publisher2, result.get(1));
+
+        verify(journalRepository).getPublisherOptions("Elsevier", 10);
+        verifyNoMoreInteractions(journalRepository);
+    }
+
+    @Test
+    void getPublisherOptions_usesDefaultLimit_whenLimitIsNullOrInvalid() {
+        when(journalRepository.getPublisherOptions("Springer", 20))
+                .thenReturn(List.of());
+
+        journalService.getPublisherOptions("Springer", null);
+        verify(journalRepository).getPublisherOptions("Springer", 20);
+
+        clearInvocations(journalRepository);
+
+        journalService.getPublisherOptions("Springer", integer(0));
+        verify(journalRepository).getPublisherOptions("Springer", 20);
+
+        clearInvocations(journalRepository);
+
+        journalService.getPublisherOptions("Springer", integer(-5));
+        verify(journalRepository).getPublisherOptions("Springer", 20);
+
+        verifyNoMoreInteractions(journalRepository);
+    }
+
+    @Test
+    void getPublisherOptions_capsLimitToMaxLimit() {
+        when(journalRepository.getPublisherOptions("IEEE", 50))
+                .thenReturn(List.of());
+
+        List<PublisherOptionDto> result =
+                journalService.getPublisherOptions("IEEE", integer(500));
+
+        assertNotNull(result);
+        assertTrue(result.isEmpty());
+
+        verify(journalRepository).getPublisherOptions("IEEE", 50);
+        verifyNoMoreInteractions(journalRepository);
+    }
+
+    @Test
+    void getPublisherQuartilePublicationStats_returnsExpectedStats() {
+        int publisherId = 3;
+
+        PublisherQuartileStatsDto stats1 = mock(PublisherQuartileStatsDto.class);
+        PublisherQuartileStatsDto stats2 = mock(PublisherQuartileStatsDto.class);
+
+        List<PublisherQuartileStatsDto> expectedStats = List.of(stats1, stats2);
+
+        when(journalRepository.getPublisherQuartilePublicationStatsById(publisherId))
+                .thenReturn(expectedStats);
+
+        List<PublisherQuartileStatsDto> result =
+                journalService.getPublisherQuartilePublicationStats(publisherId);
+
+        assertEquals(expectedStats, result);
+        assertSame(stats1, result.get(0));
+        assertSame(stats2, result.get(1));
+
+        verify(journalRepository).getPublisherQuartilePublicationStatsById(publisherId);
+        verifyNoMoreInteractions(journalRepository);
+    }
+
+    @Test
+    void getPublisherQuartilePublicationStats_throwsException_whenPublisherIdIsNotPositive() {
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> journalService.getPublisherQuartilePublicationStats(0)
+        );
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> journalService.getPublisherQuartilePublicationStats(-1)
+        );
+
+        verifyNoInteractions(journalRepository);
+    }
+
+    @Test
+    void getPublisherQuartilePublicationStatsForPublishers_returnsEmptyList_whenPublisherIdsAreNullOrEmpty() {
+        List<PublisherQuartileStatsDto> nullResult =
+                journalService.getPublisherQuartilePublicationStatsForPublishers(null);
+
+        assertNotNull(nullResult);
+        assertTrue(nullResult.isEmpty());
+
+        List<PublisherQuartileStatsDto> emptyResult =
+                journalService.getPublisherQuartilePublicationStatsForPublishers(List.of());
+
+        assertNotNull(emptyResult);
+        assertTrue(emptyResult.isEmpty());
+
+        verifyNoInteractions(journalRepository);
+    }
+
+    @Test
+    void getPublisherQuartilePublicationStatsForPublishers_ignoresNullIdsAndRemovesDuplicates() {
+        PublisherQuartileStatsDto stats1 = mock(PublisherQuartileStatsDto.class);
+        PublisherQuartileStatsDto stats2 = mock(PublisherQuartileStatsDto.class);
+
+        when(journalRepository.getPublisherQuartilePublicationStatsById(1))
+                .thenReturn(List.of(stats1));
+
+        when(journalRepository.getPublisherQuartilePublicationStatsById(2))
+                .thenReturn(List.of(stats2));
+
+        List<Integer> publisherIds = new ArrayList<>();
+        publisherIds.add(1);
+        publisherIds.add(null);
+        publisherIds.add(2);
+        publisherIds.add(1);
+
+        List<PublisherQuartileStatsDto> result =
+                journalService.getPublisherQuartilePublicationStatsForPublishers(publisherIds);
+
+        assertEquals(2, result.size());
+        assertSame(stats1, result.get(0));
+        assertSame(stats2, result.get(1));
+
+        verify(journalRepository).getPublisherQuartilePublicationStatsById(1);
+        verify(journalRepository).getPublisherQuartilePublicationStatsById(2);
+        verifyNoMoreInteractions(journalRepository);
+    }
+
+    @Test
+    void getPublisherQuartilePublicationStatsForPublishers_throwsException_whenPublisherIdIsNotPositive() {
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> journalService.getPublisherQuartilePublicationStatsForPublishers(
+                        List.of(1, 0, 2)
+                )
+        );
+
+        verifyNoInteractions(journalRepository);
+    }
+
+    @Test
+    void getPublisherQuartilePublicationStatsForPublishers_throwsException_whenMoreThanMaxPublishersAreSelected() {
+        List<Integer> publisherIds =
+                List.of(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11);
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> journalService.getPublisherQuartilePublicationStatsForPublishers(publisherIds)
+        );
+
+        verifyNoInteractions(journalRepository);
+    }
+
+    @Test
+    void getJournalRankingScatterData_passesMetricsAndLimitToRepository() {
+        ScatterPlotPointDto point1 = mock(ScatterPlotPointDto.class);
+        ScatterPlotPointDto point2 = mock(ScatterPlotPointDto.class);
+
+        List<ScatterPlotPointDto> expectedPoints = List.of(point1, point2);
+
+        when(journalRepository.findJournalRankingScatterData("sjr", "hIndex", 100))
+                .thenReturn(expectedPoints);
+
+        List<ScatterPlotPointDto> result =
+                journalService.getJournalRankingScatterData("sjr", "hIndex", integer(100));
+
+        assertEquals(expectedPoints, result);
+        assertSame(point1, result.get(0));
+        assertSame(point2, result.get(1));
+
+        verify(journalRepository).findJournalRankingScatterData("sjr", "hIndex", 100);
+        verifyNoMoreInteractions(journalRepository);
+    }
+
+    @Test
+    void getJournalRankingScatterData_usesNullLimit_whenLimitIsNullOrInvalid() {
+        when(journalRepository.findJournalRankingScatterData("sjr", "hIndex", null))
+                .thenReturn(List.of());
+
+        journalService.getJournalRankingScatterData("sjr", "hIndex", null);
+        verify(journalRepository).findJournalRankingScatterData("sjr", "hIndex", null);
+
+        clearInvocations(journalRepository);
+
+        journalService.getJournalRankingScatterData("sjr", "hIndex", integer(0));
+        verify(journalRepository).findJournalRankingScatterData("sjr", "hIndex", null);
+
+        clearInvocations(journalRepository);
+
+        journalService.getJournalRankingScatterData("sjr", "hIndex", integer(-10));
+        verify(journalRepository).findJournalRankingScatterData("sjr", "hIndex", null);
+
+        verifyNoMoreInteractions(journalRepository);
+    }
+
+    @Test
+    void getJournalRankingScatterData_capsLimitToMaxLimit() {
+        when(journalRepository.findJournalRankingScatterData("sjr", "hIndex", 1000))
+                .thenReturn(List.of());
+
+        List<ScatterPlotPointDto> result =
+                journalService.getJournalRankingScatterData("sjr", "hIndex", integer(5000));
+
+        assertNotNull(result);
+        assertTrue(result.isEmpty());
+
+        verify(journalRepository).findJournalRankingScatterData("sjr", "hIndex", 1000);
+        verifyNoMoreInteractions(journalRepository);
+    }
+
+    @Test
+    void getJournalYearlyStats_usesDefaultYearRange_whenYearsAreNull() {
+        int journalId = 8;
+
+        JournalYearlyStatsDto stats = mock(JournalYearlyStatsDto.class);
+
+        when(journalRepository.findJournalYearlyStats(journalId, 0, 9999))
+                .thenReturn(List.of(stats));
+
+        List<JournalYearlyStatsDto> result =
+                journalService.getJournalYearlyStats(journalId, null, null);
+
+        assertEquals(1, result.size());
+        assertSame(stats, result.get(0));
+
+        verify(journalRepository).findJournalYearlyStats(journalId, 0, 9999);
+        verifyNoMoreInteractions(journalRepository);
     }
 }

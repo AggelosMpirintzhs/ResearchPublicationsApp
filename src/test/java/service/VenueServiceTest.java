@@ -901,4 +901,169 @@ class VenueServiceTest {
         result.add(secondValue);
         return result;
     }
+    @Test
+    void searchVenues_normalizesSearchTextForMinimumLengthAndSortingButPassesOriginalTextToService() {
+        String searchText = "  Dátá!!!  ";
+
+        JournalSearchResultDto exactMatch =
+                journalSearchResult(integer(1), "Data", "Publisher A");
+
+        JournalSearchResultDto containsMatch =
+                journalSearchResult(integer(2), "Big Data Journal", "Publisher B");
+
+        when(journalService.searchJournals(searchText, integer(10)))
+                .thenReturn(List.of(
+                        containsMatch,
+                        exactMatch
+                ));
+
+        List<Object> result =
+                venueService.searchVenues(
+                        VenueService.TYPE_JOURNAL,
+                        searchText,
+                        integer(10)
+                );
+
+        assertEquals(2, result.size());
+        assertSame(exactMatch, result.get(0));
+        assertSame(containsMatch, result.get(1));
+
+        verify(journalService).searchJournals(searchText, integer(10));
+        verifyNoInteractions(conferenceService);
+        verifyNoMoreInteractions(journalService);
+    }
+
+    @Test
+    void searchVenues_sortsResultsWithSameRelevanceByTitleLengthAndAlphabetically() {
+        JournalSearchResultDto longerTitle =
+                journalSearchResult(integer(1), "Data Science Journal", "Publisher A");
+
+        JournalSearchResultDto shorterTitle =
+                journalSearchResult(integer(2), "Data Journal", "Publisher B");
+
+        JournalSearchResultDto sameLengthAlphabeticallySecond =
+                journalSearchResult(integer(3), "Data Zebra", "Publisher C");
+
+        JournalSearchResultDto sameLengthAlphabeticallyFirst =
+                journalSearchResult(integer(4), "Data Alpha", "Publisher D");
+
+        when(journalService.searchJournals("data", integer(10)))
+                .thenReturn(List.of(
+                        longerTitle,
+                        sameLengthAlphabeticallySecond,
+                        shorterTitle,
+                        sameLengthAlphabeticallyFirst
+                ));
+
+        List<Object> result =
+                venueService.searchVenues(
+                        VenueService.TYPE_JOURNAL,
+                        "data",
+                        integer(10)
+                );
+
+        assertEquals(4, result.size());
+        assertSame(sameLengthAlphabeticallyFirst, result.get(0));
+        assertSame(sameLengthAlphabeticallySecond, result.get(1));
+        assertSame(shorterTitle, result.get(2));
+        assertSame(longerTitle, result.get(3));
+
+        verify(journalService).searchJournals("data", integer(10));
+        verifyNoInteractions(conferenceService);
+        verifyNoMoreInteractions(journalService);
+    }
+
+    @Test
+    void loadVenueArticlesInBatches_doesNotCallService_whenShouldContinueReturnsFalseImmediately() {
+        int venueId = 3;
+        Integer startYear = integer(2010);
+        Integer endYear = integer(2020);
+        Integer batchSize = integer(2);
+
+        AtomicInteger checks = new AtomicInteger(0);
+        List<List<Object>> loadedBatches = new ArrayList<>();
+
+        venueService.loadVenueArticlesInBatches(
+                VenueService.TYPE_JOURNAL,
+                venueId,
+                startYear,
+                endYear,
+                null,
+                batchSize,
+                loadedBatches::add,
+                () -> {
+                    checks.incrementAndGet();
+                    return false;
+                }
+        );
+
+        assertEquals(1, checks.get());
+        assertTrue(loadedBatches.isEmpty());
+
+        verifyNoInteractions(journalService);
+        verifyNoInteractions(conferenceService);
+    }
+
+    @Test
+    void loadVenueArticlesInBatches_usesGivenInitialLastArticleId() {
+        int venueId = 3;
+        Integer startYear = integer(2010);
+        Integer endYear = integer(2020);
+        Integer initialLastArticleId = integer(500);
+        Integer batchSize = integer(2);
+
+        JournalArticleDto article501 = journalArticle(integer(501));
+
+        when(journalService.getJournalArticlesBatch(
+                venueId,
+                startYear,
+                endYear,
+                initialLastArticleId,
+                batchSize
+        )).thenReturn(List.of(article501));
+
+        when(journalService.getJournalArticlesBatch(
+                venueId,
+                startYear,
+                endYear,
+                integer(501),
+                batchSize
+        )).thenReturn(List.of());
+
+        List<List<Object>> loadedBatches = new ArrayList<>();
+
+        venueService.loadVenueArticlesInBatches(
+                VenueService.TYPE_JOURNAL,
+                venueId,
+                startYear,
+                endYear,
+                initialLastArticleId,
+                batchSize,
+                loadedBatches::add,
+                () -> true
+        );
+
+        assertEquals(1, loadedBatches.size());
+        assertEquals(ids(501), articleIdsFromObjects(loadedBatches.get(0)));
+
+        verify(journalService).getJournalArticlesBatch(
+                venueId,
+                startYear,
+                endYear,
+                initialLastArticleId,
+                batchSize
+        );
+
+        verify(journalService).getJournalArticlesBatch(
+                venueId,
+                startYear,
+                endYear,
+                integer(501),
+                batchSize
+        );
+
+        verifyNoInteractions(conferenceService);
+        verifyNoMoreInteractions(journalService);
+    }
+
 }
