@@ -49,6 +49,7 @@ Run the loading script:
 source sql/project_database_dump.sql;
 ```
 This imports the generated TSV files into the MySQL database tables.
+-Before running, update the paths according to your local MySQL installation .
 
 Run the script with views:
 ```sql
@@ -82,7 +83,7 @@ Before running the project, make sure the following are installed:
 
 - Java JDK 21 or later
 - Maven
-- MySQL Server
+- MySQL 8.0.40
 - Python 3.10 or later
 
 The application was developed as a JavaFX desktop application and uses JDBC with HikariCP for database access.
