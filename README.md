@@ -64,4 +64,27 @@ Run the JavaFX application from:
 ```text
 app.Launcher
 ```
+##Team Members
+Antoniadou Maria , Liakou Olga, Mpirintzhs Aggelos
 
+## Requirements
+
+Before running the project, make sure the following are installed:
+
+- Java JDK 21 or later
+- Maven
+- MySQL Server
+- MySQL Workbench
+- Python 3.10 or later
+
+The application was developed as a JavaFX desktop application and uses JDBC with HikariCP for database access.
+
+## Notes
+
+- The database backup is not stored directly in the repository because of its large size.
+Backup link:
+
+```text
+https://drive.google.com/file/d/1wH1c3g-lUPS18V39-5-v3O7Oz04-iJQk/view?usp=drive_link
+```
+- The `application.properties` file may need local changes depending on the MySQL setup.
