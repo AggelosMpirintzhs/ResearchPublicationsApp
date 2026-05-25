@@ -64,7 +64,8 @@ Run the JavaFX application from:
 ```text
 app.Launcher
 ```
-##Team Members
+## Team Members
+
 Antoniadou Maria , Liakou Olga, Mpirintzhs Aggelos
 
 ## Requirements
