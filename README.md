@@ -83,7 +83,6 @@ Before running the project, make sure the following are installed:
 - Java JDK 21 or later
 - Maven
 - MySQL Server
-- MySQL Workbench
 - Python 3.10 or later
 
 The application was developed as a JavaFX desktop application and uses JDBC with HikariCP for database access.
