@@ -31,7 +31,9 @@ import javafx.scene.control.TableView;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.VBox;
 import javafx.scene.input.KeyCode;
+import javafx.scene.input.KeyEvent;
 import javafx.scene.input.MouseButton;
+import javafx.scene.input.MouseEvent;
 import javafx.util.Duration;
 import service.AuthorService;
 import util.TableCopySupport;
@@ -76,6 +78,13 @@ public class AuthorController {
     private long expectedPublicationCount = 0;
 
     private TableSearchSupport<AuthorPublicationDto> publicationSearchSupport;
+
+    private enum EnterActionTarget {
+        PROFILE_LOAD,
+        PUBLICATION_SEARCH_NEXT
+    }
+
+    private EnterActionTarget enterActionTarget = EnterActionTarget.PROFILE_LOAD;
 
     @FXML
     private TextField authorSearchField;
@@ -194,7 +203,6 @@ public class AuthorController {
     @FXML
     private TableColumn<AuthorPublicationDto, String> publicationUrlColumn;
 
-    // Initializes author page
     @FXML
     public void initialize() {
         setupSearchField();
@@ -204,6 +212,8 @@ public class AuthorController {
         setupCharts();
         setupPublicationsTable();
         setupPublicationSearchSupport();
+        setupEnterModeTracking();
+        setupEnterKeyBehavior();
 
         clearAuthorResults();
         setSelectedAuthor(null);
@@ -211,7 +221,6 @@ public class AuthorController {
         setPublicationReportVisible(false);
     }
 
-    // Sets search field
     private void setupSearchField() {
         searchDebounce = new PauseTransition(Duration.millis(SEARCH_DEBOUNCE_MS));
         searchDebounce.setOnFinished(event -> searchAuthorsRealtime());
@@ -221,15 +230,16 @@ public class AuthorController {
         }
 
         authorSearchField.textProperty().addListener((observable, oldValue, newValue) -> {
+            useProfileLoadEnter();
+
             if (searchDebounce != null) {
                 searchDebounce.playFromStart();
             }
         });
 
-        authorSearchField.setOnAction(event -> searchAuthorsRealtime());
+        authorSearchField.setOnAction(event -> event.consume());
     }
 
-    // Searches authors live
     private void searchAuthorsRealtime() {
         String searchText = authorSearchField == null ? "" : authorSearchField.getText().trim();
 
@@ -246,7 +256,6 @@ public class AuthorController {
         String requestedSearchText = searchText;
 
         authorSearchTask = new Task<>() {
-            // Runs author search
             @Override
             protected List<AuthorSearchResultDto> call() {
                 return authorService.searchAuthors(requestedSearchText, SEARCH_LIMIT);
@@ -274,7 +283,6 @@ public class AuthorController {
         startBackgroundTask(authorSearchTask, "author-realtime-search-task");
     }
 
-    // Sets results list
     private void setupAuthorResultsListView() {
         if (authorResultsListView == null) {
             return;
@@ -285,7 +293,6 @@ public class AuthorController {
 
         authorResultsListView.setCellFactory(listView -> {
             ListCell<AuthorSearchResultDto> cell = new ListCell<>() {
-                // Updates author cell
                 @Override
                 protected void updateItem(AuthorSearchResultDto author, boolean empty) {
                     super.updateItem(author, empty);
@@ -304,6 +311,7 @@ public class AuthorController {
                                 && event.getClickCount() == 2
                                 && !cell.isEmpty()
                 ) {
+                    useProfileLoadEnter();
                     authorResultsListView.getSelectionModel().select(cell.getItem());
                     openSelectedAuthorProfile();
                     event.consume();
@@ -316,6 +324,7 @@ public class AuthorController {
         authorResultsListView.getSelectionModel().selectedItemProperty().addListener(
                 (observable, oldValue, selected) -> {
                     if (selected != null) {
+                        useProfileLoadEnter();
                         stopCurrentPublicationLoading();
                         setSelectedAuthor(selected);
                         clearResultArea();
@@ -325,13 +334,16 @@ public class AuthorController {
 
         authorResultsListView.setOnKeyPressed(event -> {
             if (event.getCode() == KeyCode.ENTER) {
-                openSelectedAuthorProfile();
                 event.consume();
+
+                if (authorResultsListView.getSelectionModel().getSelectedItem() != null) {
+                    useProfileLoadEnter();
+                    openSelectedAuthorProfile();
+                }
             }
         });
     }
 
-    // Opens selected author
     private void openSelectedAuthorProfile() {
         if (authorResultsListView == null) {
             return;
@@ -343,11 +355,168 @@ public class AuthorController {
             return;
         }
 
+        useProfileLoadEnter();
         setSelectedAuthor(selected);
         loadAuthorProfile();
     }
 
-    // Sets year filters
+    private void setupEnterModeTracking() {
+        registerProfileLoadEnterTarget(authorSearchField);
+        registerProfileLoadEnterTarget(authorResultsListView);
+        registerProfileLoadEnterTarget(fromYearComboBox);
+        registerProfileLoadEnterTarget(toYearComboBox);
+        registerProfileLoadEnterTarget(loadPublicationsCheckBox);
+        registerProfileLoadEnterTarget(loadProfileButton);
+
+        registerPublicationSearchEnterTarget(publicationSearchModeComboBox);
+        registerPublicationSearchEnterTarget(publicationSearchField);
+        registerPublicationSearchEnterTarget(publicationSearchNextButton);
+
+        if (fromYearComboBox != null) {
+            fromYearComboBox.valueProperty().addListener((observable, oldValue, newValue) ->
+                    useProfileLoadEnter()
+            );
+        }
+
+        if (toYearComboBox != null) {
+            toYearComboBox.valueProperty().addListener((observable, oldValue, newValue) ->
+                    useProfileLoadEnter()
+            );
+        }
+
+        if (loadPublicationsCheckBox != null) {
+            loadPublicationsCheckBox.selectedProperty().addListener((observable, oldValue, newValue) ->
+                    useProfileLoadEnter()
+            );
+        }
+
+        if (publicationSearchField != null) {
+            publicationSearchField.textProperty().addListener((observable, oldValue, newValue) ->
+                    usePublicationSearchNextEnter()
+            );
+        }
+
+        if (publicationSearchModeComboBox != null) {
+            publicationSearchModeComboBox.valueProperty().addListener((observable, oldValue, newValue) ->
+                    usePublicationSearchNextEnter()
+            );
+        }
+    }
+
+    private void registerProfileLoadEnterTarget(Node node) {
+        if (node == null) {
+            return;
+        }
+
+        node.focusedProperty().addListener((observable, oldValue, focused) -> {
+            if (focused) {
+                useProfileLoadEnter();
+            }
+        });
+
+        node.addEventFilter(MouseEvent.MOUSE_PRESSED, event ->
+                useProfileLoadEnter()
+        );
+    }
+
+    private void registerPublicationSearchEnterTarget(Node node) {
+        if (node == null) {
+            return;
+        }
+
+        node.focusedProperty().addListener((observable, oldValue, focused) -> {
+            if (focused) {
+                usePublicationSearchNextEnter();
+            }
+        });
+
+        node.addEventFilter(MouseEvent.MOUSE_PRESSED, event ->
+                usePublicationSearchNextEnter()
+        );
+    }
+
+    private void useProfileLoadEnter() {
+        enterActionTarget = EnterActionTarget.PROFILE_LOAD;
+    }
+
+    private void usePublicationSearchNextEnter() {
+        enterActionTarget = EnterActionTarget.PUBLICATION_SEARCH_NEXT;
+    }
+
+    private boolean shouldEnterRunPublicationSearch() {
+        if (publicationSearchSupport == null) {
+            return false;
+        }
+
+        if (publicationReportPanel != null && !publicationReportPanel.isVisible()) {
+            return false;
+        }
+
+        if (publicationSearchField != null && publicationSearchField.isFocused()) {
+            return true;
+        }
+
+        if (publicationSearchModeComboBox != null && publicationSearchModeComboBox.isFocused()) {
+            return true;
+        }
+
+        if (publicationSearchNextButton != null && publicationSearchNextButton.isFocused()) {
+            return true;
+        }
+
+        return enterActionTarget == EnterActionTarget.PUBLICATION_SEARCH_NEXT;
+    }
+
+    private boolean shouldIgnoreProfileLoadEnter() {
+        return authorSearchField != null && authorSearchField.isFocused();
+    }
+
+    private void loadSelectedAuthorFromEnter() {
+        AuthorSearchResultDto selected = null;
+
+        if (authorResultsListView != null) {
+            selected = authorResultsListView.getSelectionModel().getSelectedItem();
+        }
+
+        if (selected == null) {
+            selected = selectedAuthor;
+        }
+
+        if (selected == null) {
+            return;
+        }
+
+        setSelectedAuthor(selected);
+        loadAuthorProfile();
+    }
+
+    private void setupEnterKeyBehavior() {
+        Platform.runLater(() -> {
+            if (authorResultsListView == null || authorResultsListView.getScene() == null) {
+                return;
+            }
+
+            authorResultsListView.getScene().addEventFilter(KeyEvent.KEY_PRESSED, event -> {
+                if (event.getCode() != KeyCode.ENTER) {
+                    return;
+                }
+
+                event.consume();
+
+                if (shouldEnterRunPublicationSearch()) {
+                    findNextPublicationMatch();
+                    return;
+                }
+
+                if (shouldIgnoreProfileLoadEnter()) {
+                    return;
+                }
+
+                loadSelectedAuthorFromEnter();
+            });
+        });
+    }
+
     private void setupYearComboBoxes() {
         setupYearComboBox(fromYearComboBox);
         setupYearComboBox(toYearComboBox);
@@ -359,7 +528,6 @@ public class AuthorController {
         }
     }
 
-    // Sets year combo
     private void setupYearComboBox(ComboBox<Integer> comboBox) {
         if (comboBox == null) {
             return;
@@ -369,7 +537,6 @@ public class AuthorController {
         comboBox.getItems().setAll(buildYearList(MIN_YEAR));
     }
 
-    // Builds year list
     private List<Integer> buildYearList(Integer minimumYear) {
         int currentYear = LocalDate.now().getYear();
         int min = minimumYear == null ? MIN_YEAR : minimumYear;
@@ -383,7 +550,6 @@ public class AuthorController {
         return years;
     }
 
-    // Refreshes year options
     private void refreshToYearOptions(Integer fromYear) {
         if (toYearComboBox == null) {
             return;
@@ -403,12 +569,13 @@ public class AuthorController {
         }
     }
 
-    // Sets publication option
     private void setupLoadPublicationsOption() {
         setPublicationReportVisible(false);
 
         if (loadPublicationsCheckBox != null) {
             loadPublicationsCheckBox.selectedProperty().addListener((observable, oldValue, newValue) -> {
+                useProfileLoadEnter();
+
                 if (!newValue) {
                     stopCurrentPublicationLoading();
                     publicationItems.clear();
@@ -421,13 +588,11 @@ public class AuthorController {
         }
     }
 
-    // Sets chart defaults
     private void setupCharts() {
         setupLineChart(totalArticlesLineChart, totalArticlesYearAxis, totalArticlesCountAxis);
         setupLineChart(publicationTypeLineChart, publicationTypeYearAxis, publicationTypeCountAxis);
     }
 
-    // Sets line chart
     private void setupLineChart(
             LineChart<Number, Number> chart,
             NumberAxis xAxis,
@@ -452,7 +617,6 @@ public class AuthorController {
         }
     }
 
-    // Sets publications table
     private void setupPublicationsTable() {
         if (publicationsTable != null) {
             publicationsTable.setItems(publicationItems);
@@ -521,7 +685,6 @@ public class AuthorController {
         }
     }
 
-    // Sets table search
     private void setupPublicationSearchSupport() {
         publicationSearchSupport = new TableSearchSupport<>(
                 publicationsTable,
@@ -547,7 +710,6 @@ public class AuthorController {
         publicationSearchSupport.initialize(SEARCH_MODE_TITLE);
     }
 
-    // Finds next publication
     @FXML
     private void findNextPublicationMatch() {
         if (publicationSearchSupport != null) {
@@ -555,7 +717,6 @@ public class AuthorController {
         }
     }
 
-    // Resets publication search
     private void resetPublicationSearchNavigation() {
         if (publicationSearchSupport != null) {
             publicationSearchSupport.resetNavigation();
@@ -564,14 +725,12 @@ public class AuthorController {
         }
     }
 
-    // Clears publication search
     private void clearPublicationSearchText() {
         if (publicationSearchSupport != null) {
             publicationSearchSupport.clearSearchText();
         }
     }
 
-    // Loads author profile
     @FXML
     private void loadAuthorProfile() {
         stopCurrentPublicationLoading();
@@ -600,7 +759,6 @@ public class AuthorController {
                 loadPublicationsCheckBox != null && loadPublicationsCheckBox.isSelected();
 
         Task<AuthorService.AuthorPageData> task = new Task<>() {
-            // Loads profile data
             @Override
             protected AuthorService.AuthorPageData call() {
                 return authorService.loadAuthorPageData(
@@ -662,7 +820,6 @@ public class AuthorController {
         startBackgroundTask(task, "author-profile-task");
     }
 
-    // Starts publication loading
     private void startPublicationBatchLoading(
             int authorId,
             Integer startYear,
@@ -677,7 +834,6 @@ public class AuthorController {
         updatePublicationsLoadedLabel(0, expectedPublicationCount);
 
         publicationLoadingTask = new Task<>() {
-            // Loads publication batches
             @Override
             protected Void call() {
                 authorService.loadAuthorPublicationsInBatches(
@@ -729,7 +885,6 @@ public class AuthorController {
         startBackgroundTask(publicationLoadingTask, "author-publication-batch-loading-task");
     }
 
-    // Stops publication loading
     private void stopCurrentPublicationLoading() {
         stopPublicationLoading = true;
 
@@ -738,7 +893,6 @@ public class AuthorController {
         }
     }
 
-    // Clears author page
     @FXML
     private void clear() {
         stopCurrentPublicationLoading();
@@ -768,9 +922,9 @@ public class AuthorController {
         setSelectedAuthor(null);
         clearPublicationSearchText();
         clearResultArea();
+        useProfileLoadEnter();
     }
 
-    // Returns to home
     @FXML
     private void backToHome() {
         stopCurrentPublicationLoading();
@@ -791,7 +945,6 @@ public class AuthorController {
         }
     }
 
-    // Updates profile labels
     private void updateProfileLabels(AuthorProfileDto profile) {
         setLabelText(firstYearLabel, profile.firstYear());
         setLabelText(lastYearLabel, profile.lastYear());
@@ -807,7 +960,6 @@ public class AuthorController {
         setLabelText(avgArticlesPerYearLabel, formatDouble(profile.avgArticlesPerYear()));
     }
 
-    // Updates articles chart
     private void updateTotalArticlesChart(List<AuthorYearlyStatsDto> yearlyStats) {
         if (totalArticlesLineChart != null) {
             totalArticlesLineChart.getData().clear();
@@ -847,7 +999,6 @@ public class AuthorController {
         configureValueAxis(totalArticlesCountAxis, maxArticles);
     }
 
-    // Updates type chart
     private void updatePublicationTypeChart(List<AuthorYearlyStatsByTypeDto> yearlyStats) {
         if (publicationTypeLineChart != null) {
             publicationTypeLineChart.getData().clear();
@@ -895,7 +1046,6 @@ public class AuthorController {
         configureValueAxis(publicationTypeCountAxis, maxValue);
     }
 
-    // Clears chart data
     private void clearCharts() {
         if (totalArticlesLineChart != null) {
             totalArticlesLineChart.getData().clear();
@@ -909,13 +1059,11 @@ public class AuthorController {
         resetLineChartAxes(publicationTypeYearAxis, publicationTypeCountAxis);
     }
 
-    // Resets chart axes
     private void resetLineChartAxes(NumberAxis xAxis, NumberAxis yAxis) {
         configureYearAxis(xAxis, MIN_YEAR, LocalDate.now().getYear());
         configureValueAxis(yAxis, 10);
     }
 
-    // Configures year axis
     private void configureYearAxis(NumberAxis axis, Integer minYear, Integer maxYear) {
         if (axis == null) {
             return;
@@ -944,7 +1092,6 @@ public class AuthorController {
         axis.setMinorTickVisible(false);
     }
 
-    // Calculates year ticks
     private int calculateYearTickUnit(int yearRange) {
         if (yearRange <= 10) {
             return 1;
@@ -961,7 +1108,6 @@ public class AuthorController {
         return 20;
     }
 
-    // Configures value axis
     private void configureValueAxis(NumberAxis axis, double maxValue) {
         if (axis == null) {
             return;
@@ -977,7 +1123,6 @@ public class AuthorController {
         axis.setMinorTickVisible(false);
     }
 
-    // Calculates upper bound
     private double calculateNiceUpperBound(double maxValue) {
         if (maxValue <= 0) {
             return 10;
@@ -990,7 +1135,6 @@ public class AuthorController {
         return Math.ceil(paddedValue / tickUnit) * tickUnit;
     }
 
-    // Calculates tick unit
     private double calculateNiceTickUnit(double upperBound) {
         if (upperBound <= 0) {
             return 1;
@@ -1000,7 +1144,6 @@ public class AuthorController {
         return calculateNiceRawTickUnit(roughTickUnit);
     }
 
-    // Calculates nice tick
     private double calculateNiceRawTickUnit(double value) {
         if (value <= 0) {
             return 1;
@@ -1026,7 +1169,6 @@ public class AuthorController {
         return niceNormalized * magnitude;
     }
 
-    // Clears result area
     private void clearResultArea() {
         setLabelText(firstYearLabel, "-");
         setLabelText(lastYearLabel, "-");
@@ -1052,7 +1194,6 @@ public class AuthorController {
         setPublicationReportVisible(false);
     }
 
-    // Clears author results
     private void clearAuthorResults() {
         authorSearchItems.clear();
 
@@ -1064,7 +1205,6 @@ public class AuthorController {
         setAuthorResultsVisible(false);
     }
 
-    // Sets selected author
     private void setSelectedAuthor(AuthorSearchResultDto author) {
         selectedAuthor = author;
 
@@ -1079,7 +1219,6 @@ public class AuthorController {
         }
     }
 
-    // Shows author results
     private void setAuthorResultsVisible(boolean visible) {
         if (authorResultsContainer != null) {
             authorResultsContainer.setVisible(visible);
@@ -1087,7 +1226,6 @@ public class AuthorController {
         }
     }
 
-    // Shows publication report
     private void setPublicationReportVisible(boolean visible) {
         if (publicationReportPanel != null) {
             publicationReportPanel.setVisible(visible);
@@ -1095,7 +1233,6 @@ public class AuthorController {
         }
     }
 
-    // Gets selected years
     private YearRange getSelectedYearRange() {
         Integer startYear = getComboBoxYearValue(fromYearComboBox);
         Integer endYear = getComboBoxYearValue(toYearComboBox);
@@ -1107,7 +1244,6 @@ public class AuthorController {
         return new YearRange(startYear, endYear);
     }
 
-    // Gets combo value
     private Integer getComboBoxYearValue(ComboBox<Integer> comboBox) {
         if (comboBox == null) {
             return null;
@@ -1116,7 +1252,6 @@ public class AuthorController {
         return comboBox.getValue();
     }
 
-    // Gets author name
     private String getAuthorDisplayName(AuthorSearchResultDto author) {
         if (author == null) {
             return "Unknown author";
@@ -1129,7 +1264,6 @@ public class AuthorController {
         return "Author #" + author.authorId();
     }
 
-    // Builds venue name
     private String buildVenueDisplayName(AuthorPublicationDto publication) {
         if (publication == null) {
             return "-";
@@ -1154,7 +1288,6 @@ public class AuthorController {
         return "-";
     }
 
-    // Gets first text
     private String firstNonBlank(String first, String second) {
         if (first != null && !first.isBlank()) {
             return first;
@@ -1167,26 +1300,22 @@ public class AuthorController {
         return null;
     }
 
-    // Converts null long
     private Long nullToZero(Long value) {
         return value == null ? 0L : value;
     }
 
-    // Updates loaded label
     private void updatePublicationsLoadedLabel(long loaded, long total) {
         if (publicationsLoadedLabel != null) {
             publicationsLoadedLabel.setText("Articles Loaded: " + loaded + " / " + total);
         }
     }
 
-    // Sets label text
     private void setLabelText(Label label, Object value) {
         if (label != null) {
             label.setText(value == null ? "-" : String.valueOf(value));
         }
     }
 
-    // Converts null text
     private String nullToDash(Object value) {
         if (value == null) {
             return "-";
@@ -1201,7 +1330,6 @@ public class AuthorController {
         return text;
     }
 
-    // Formats decimal value
     private String formatDouble(Double value) {
         if (value == null) {
             return "-";
@@ -1210,7 +1338,6 @@ public class AuthorController {
         return String.format("%.2f", value);
     }
 
-    // Sets loading state
     private void setLoading(boolean loading) {
         if (authorSearchField != null) {
             authorSearchField.setDisable(loading);
@@ -1221,11 +1348,11 @@ public class AuthorController {
         }
 
         if (fromYearComboBox != null) {
-            fromYearComboBox.setDisable(loading);
+            fromYearComboBox.setDisable(false);
         }
 
         if (toYearComboBox != null) {
-            toYearComboBox.setDisable(loading);
+            toYearComboBox.setDisable(false);
         }
 
         if (loadPublicationsCheckBox != null) {
@@ -1241,14 +1368,12 @@ public class AuthorController {
         }
     }
 
-    // Starts background task
     private void startBackgroundTask(Task<?> task, String threadName) {
         Thread thread = new Thread(task, threadName);
         thread.setDaemon(true);
         thread.start();
     }
 
-    // Shows error alert
     private void showError(String title, String message) {
         Alert alert = new Alert(Alert.AlertType.ERROR);
         alert.setTitle(title);
@@ -1257,7 +1382,6 @@ public class AuthorController {
         alert.showAndWait();
     }
 
-    // Shows info alert
     private void showInfo(String title, String message) {
         Alert alert = new Alert(Alert.AlertType.INFORMATION);
         alert.setTitle(title);

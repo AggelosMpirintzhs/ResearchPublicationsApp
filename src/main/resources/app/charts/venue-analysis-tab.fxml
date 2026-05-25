@@ -158,13 +158,10 @@
                 </VBox>
 
                 <VBox spacing="16"
-                      alignment="TOP_CENTER"
                       styleClass="dashboard-panel charts-dashboard"
-                      maxWidth="1250">
+                      maxWidth="1500">
 
-                    <HBox alignment="CENTER_LEFT"
-                          maxWidth="1150">
-
+                    <HBox alignment="CENTER_LEFT">
                         <VBox spacing="4" HBox.hgrow="ALWAYS">
                             <Label text="Yearly Comparison Line Chart"
                                    styleClass="content-title"/>
@@ -180,13 +177,11 @@
 
                     <VBox spacing="8"
                           styleClass="chart-card"
-                          prefWidth="1050"
-                          maxWidth="1050">
+                          maxWidth="1500">
 
                         <LineChart fx:id="comparisonLineChart"
-                                   prefHeight="360"
-                                   minHeight="320"
-                                   maxHeight="380"
+                                   prefHeight="430"
+                                   minHeight="410"
                                    animated="false"
                                    createSymbols="true"
                                    legendVisible="false"
@@ -217,8 +212,7 @@
                           styleClass="chart-card"
                           visible="false"
                           managed="false"
-                          prefWidth="1050"
-                          maxWidth="1050">
+                          maxWidth="1500">
 
                         <Label text="Legend"
                                styleClass="chart-card-title"/>
@@ -226,18 +220,15 @@
                         <FlowPane fx:id="lineChartLegendFlow"
                                   hgap="10"
                                   vgap="8"
-                                  prefWrapLength="1050"/>
+                                  prefWrapLength="1200"/>
                     </VBox>
                 </VBox>
 
                 <VBox spacing="16"
-                      alignment="TOP_CENTER"
                       styleClass="dashboard-panel charts-dashboard"
-                      maxWidth="1250">
+                      maxWidth="1500">
 
-                    <HBox alignment="CENTER_LEFT"
-                          maxWidth="1150">
-
+                    <HBox alignment="CENTER_LEFT">
                         <VBox spacing="4" HBox.hgrow="ALWAYS">
                             <Label text="Aggregate Bar Charts"
                                    styleClass="content-title"/>
@@ -253,23 +244,19 @@
 
                     <HBox spacing="14"
                           alignment="TOP_CENTER"
-                          styleClass="charts-row"
-                          maxWidth="1150">
+                          styleClass="charts-row">
 
                         <VBox spacing="8"
                               styleClass="chart-card"
                               HBox.hgrow="ALWAYS"
-                              minWidth="300"
-                              prefWidth="360"
-                              maxWidth="380">
+                              minWidth="320">
 
                             <Label text="Total Articles"
                                    styleClass="chart-card-title"/>
 
                             <BarChart fx:id="totalArticlesBarChart"
-                                      prefHeight="270"
-                                      minHeight="250"
-                                      maxHeight="290"
+                                      prefHeight="325"
+                                      minHeight="315"
                                       animated="false"
                                       legendVisible="false"
                                       horizontalGridLinesVisible="true"
@@ -294,17 +281,14 @@
                         <VBox spacing="8"
                               styleClass="chart-card"
                               HBox.hgrow="ALWAYS"
-                              minWidth="300"
-                              prefWidth="360"
-                              maxWidth="380">
+                              minWidth="320">
 
                             <Label text="Avg Articles / Year"
                                    styleClass="chart-card-title"/>
 
                             <BarChart fx:id="avgArticlesBarChart"
-                                      prefHeight="270"
-                                      minHeight="250"
-                                      maxHeight="290"
+                                      prefHeight="325"
+                                      minHeight="315"
                                       animated="false"
                                       legendVisible="false"
                                       horizontalGridLinesVisible="true"
@@ -329,17 +313,14 @@
                         <VBox spacing="8"
                               styleClass="chart-card"
                               HBox.hgrow="ALWAYS"
-                              minWidth="300"
-                              prefWidth="360"
-                              maxWidth="380">
+                              minWidth="320">
 
                             <Label text="Avg Author Entries / Year"
                                    styleClass="chart-card-title"/>
 
                             <BarChart fx:id="avgAuthorEntriesBarChart"
-                                      prefHeight="270"
-                                      minHeight="250"
-                                      maxHeight="290"
+                                      prefHeight="325"
+                                      minHeight="315"
                                       animated="false"
                                       legendVisible="false"
                                       horizontalGridLinesVisible="true"
@@ -367,8 +348,7 @@
                           styleClass="chart-card"
                           visible="false"
                           managed="false"
-                          prefWidth="1050"
-                          maxWidth="1050">
+                          maxWidth="1500">
 
                         <Label text="Legend"
                                styleClass="chart-card-title"/>
@@ -376,7 +356,7 @@
                         <FlowPane fx:id="barChartsLegendFlow"
                                   hgap="10"
                                   vgap="8"
-                                  prefWrapLength="1050"/>
+                                  prefWrapLength="1200"/>
                     </VBox>
                 </VBox>
             </VBox>

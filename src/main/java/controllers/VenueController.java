@@ -37,6 +37,7 @@ import javafx.util.Duration;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.MouseButton;
 import javafx.scene.input.KeyEvent;
+import javafx.scene.input.MouseEvent;
 import service.VenueService;
 import util.TableCopySupport;
 import util.TableSearchSupport;
@@ -51,12 +52,12 @@ public class VenueController {
     private static final String HOME_FXML_PATH = "/app/hello-view.fxml";
 
     private static final int MIN_YEAR = 1900;
-    private static final Integer SEARCH_LIMIT = Integer.valueOf(20);
+    private static final Integer SEARCH_LIMIT = 20;
 
     private static final int MIN_VENUE_SEARCH_LENGTH = 3;
     private static final int VENUE_SEARCH_DEBOUNCE_MS = 250;
 
-    private static final Integer ARTICLE_BATCH_SIZE = Integer.valueOf(1000);
+    private static final Integer ARTICLE_BATCH_SIZE = 1000;
 
     private static final String SEARCH_MODE_TITLE = "Title";
     private static final String SEARCH_MODE_AUTHOR = "Author";
@@ -78,11 +79,14 @@ public class VenueController {
 
     private long expectedArticleCount = 0;
 
-    /*
-     * The in-table search logic is now handled by TableSearchSupport.
-     * This keeps the controller smaller and avoids duplicate search/highlight code.
-     */
     private TableSearchSupport<Object> articleSearchSupport;
+
+    private enum EnterActionTarget {
+        PROFILE_LOAD,
+        ARTICLE_SEARCH_NEXT
+    }
+
+    private EnterActionTarget enterActionTarget = EnterActionTarget.PROFILE_LOAD;
 
     @FXML
     private ComboBox<String> venueTypeComboBox;
@@ -226,6 +230,7 @@ public class VenueController {
         setupArticleSearchSupport();
         setupLoadArticlesOption();
         setupYearlyCharts();
+        setupEnterModeTracking();
         setupEnterKeyBehavior();
 
         clearVenueResults();
@@ -588,6 +593,7 @@ public class VenueController {
         setSelectedVenue(null);
         clearResultArea();
         setLoading(false);
+        useProfileLoadEnter();
     }
 
     @FXML
@@ -623,6 +629,8 @@ public class VenueController {
         venueTypeComboBox.getSelectionModel().select(VenueService.TYPE_JOURNAL);
 
         venueTypeComboBox.setOnAction(event -> {
+            useProfileLoadEnter();
+
             stopCurrentArticleLoading();
             stopCurrentVenueSearch();
 
@@ -702,12 +710,154 @@ public class VenueController {
         }
 
         venueSearchField.textProperty().addListener((observable, oldValue, newValue) -> {
+            useProfileLoadEnter();
+
             if (venueSearchDebounce != null) {
                 venueSearchDebounce.playFromStart();
             }
         });
 
         venueSearchField.setOnAction(event -> event.consume());
+    }
+
+    private void setupEnterModeTracking() {
+
+        registerProfileLoadEnterTarget(venueTypeComboBox);
+        registerProfileLoadEnterTarget(venueSearchField);
+        registerProfileLoadEnterTarget(searchVenueButton);
+        registerProfileLoadEnterTarget(venueResultsListView);
+        registerProfileLoadEnterTarget(fromYearComboBox);
+        registerProfileLoadEnterTarget(toYearComboBox);
+        registerProfileLoadEnterTarget(loadArticlesCheckBox);
+        registerProfileLoadEnterTarget(loadProfileButton);
+
+        registerArticleSearchEnterTarget(articleSearchModeComboBox);
+        registerArticleSearchEnterTarget(articleSearchField);
+        registerArticleSearchEnterTarget(articleSearchNextButton);
+
+        if (venueTypeComboBox != null) {
+            venueTypeComboBox.valueProperty().addListener((observable, oldValue, newValue) ->
+                    useProfileLoadEnter()
+            );
+        }
+
+        if (fromYearComboBox != null) {
+            fromYearComboBox.valueProperty().addListener((observable, oldValue, newValue) ->
+                    useProfileLoadEnter()
+            );
+        }
+
+        if (toYearComboBox != null) {
+            toYearComboBox.valueProperty().addListener((observable, oldValue, newValue) ->
+                    useProfileLoadEnter()
+            );
+        }
+
+        if (loadArticlesCheckBox != null) {
+            loadArticlesCheckBox.selectedProperty().addListener((observable, oldValue, newValue) ->
+                    useProfileLoadEnter()
+            );
+        }
+
+        if (articleSearchField != null) {
+            articleSearchField.textProperty().addListener((observable, oldValue, newValue) ->
+                    useArticleSearchNextEnter()
+            );
+        }
+
+        if (articleSearchModeComboBox != null) {
+            articleSearchModeComboBox.valueProperty().addListener((observable, oldValue, newValue) ->
+                    useArticleSearchNextEnter()
+            );
+        }
+    }
+
+    private void registerProfileLoadEnterTarget(Node node) {
+        if (node == null) {
+            return;
+        }
+
+        node.focusedProperty().addListener((observable, oldValue, focused) -> {
+            if (focused) {
+                useProfileLoadEnter();
+            }
+        });
+
+        node.addEventFilter(MouseEvent.MOUSE_PRESSED, event ->
+                useProfileLoadEnter()
+        );
+    }
+
+    private void registerArticleSearchEnterTarget(Node node) {
+        if (node == null) {
+            return;
+        }
+
+        node.focusedProperty().addListener((observable, oldValue, focused) -> {
+            if (focused) {
+                useArticleSearchNextEnter();
+            }
+        });
+
+        node.addEventFilter(MouseEvent.MOUSE_PRESSED, event ->
+                useArticleSearchNextEnter()
+        );
+    }
+
+    private void useProfileLoadEnter() {
+        enterActionTarget = EnterActionTarget.PROFILE_LOAD;
+    }
+
+    private void useArticleSearchNextEnter() {
+        enterActionTarget = EnterActionTarget.ARTICLE_SEARCH_NEXT;
+    }
+
+    private boolean shouldEnterRunArticleSearch() {
+        if (articleSearchSupport == null) {
+            return false;
+        }
+
+        if (articleReportPanel != null && !articleReportPanel.isVisible()) {
+            return false;
+        }
+
+        if (articleSearchField != null && articleSearchField.isFocused()) {
+            return true;
+        }
+
+        if (articleSearchModeComboBox != null && articleSearchModeComboBox.isFocused()) {
+            return true;
+        }
+
+        if (articleSearchNextButton != null && articleSearchNextButton.isFocused()) {
+            return true;
+        }
+
+        return enterActionTarget == EnterActionTarget.ARTICLE_SEARCH_NEXT;
+    }
+
+    private boolean shouldIgnoreProfileLoadEnter() {
+
+        return venueSearchField != null && venueSearchField.isFocused();
+    }
+
+    private void loadSelectedVenueFromEnter() {
+        Object selected = null;
+
+        if (venueResultsListView != null) {
+            selected = venueResultsListView.getSelectionModel().getSelectedItem();
+        }
+
+        if (selected == null) {
+            selected = selectedVenue;
+        }
+
+        if (selected == null) {
+            return;
+        }
+
+        setSelectedVenue(selected);
+        loadVenueProfile();
     }
 
     private void setupEnterKeyBehavior() {
@@ -721,29 +871,18 @@ public class VenueController {
                     return;
                 }
 
-                Object selected = null;
-
-                if (venueResultsListView != null) {
-                    selected = venueResultsListView.getSelectionModel().getSelectedItem();
-                }
-
-                if (selected == null) {
-                    selected = selectedVenue;
-                }
-
-                /*
-                 * Important:
-                 * We always consume ENTER so it cannot trigger another focused/default button,
-                 * for example the Back/Home action.
-                 */
                 event.consume();
 
-                if (selected == null) {
+                if (shouldEnterRunArticleSearch()) {
+                    findNextArticleMatch();
                     return;
                 }
 
-                setSelectedVenue(selected);
-                loadVenueProfile();
+                if (shouldIgnoreProfileLoadEnter()) {
+                    return;
+                }
+
+                loadSelectedVenueFromEnter();
             });
         });
     }
@@ -775,6 +914,7 @@ public class VenueController {
                                 && event.getClickCount() == 2
                                 && !cell.isEmpty()
                 ) {
+                    useProfileLoadEnter();
                     venueResultsListView.getSelectionModel().select(cell.getItem());
                     openSelectedVenueProfile();
                     event.consume();
@@ -787,6 +927,7 @@ public class VenueController {
         venueResultsListView.getSelectionModel().selectedItemProperty().addListener(
                 (observable, oldValue, selected) -> {
                     if (selected != null) {
+                        useProfileLoadEnter();
                         stopCurrentArticleLoading();
                         setSelectedVenue(selected);
                         clearResultArea();
@@ -799,6 +940,7 @@ public class VenueController {
                 event.consume();
 
                 if (venueResultsListView.getSelectionModel().getSelectedItem() != null) {
+                    useProfileLoadEnter();
                     openSelectedVenueProfile();
                 }
             }
@@ -816,6 +958,7 @@ public class VenueController {
             return;
         }
 
+        useProfileLoadEnter();
         setSelectedVenue(selected);
         loadVenueProfile();
     }
@@ -825,6 +968,8 @@ public class VenueController {
 
         if (loadArticlesCheckBox != null) {
             loadArticlesCheckBox.selectedProperty().addListener((observable, oldValue, newValue) -> {
+                useProfileLoadEnter();
+
                 if (!newValue) {
                     stopCurrentArticleLoading();
                     articleItems.clear();
@@ -1521,11 +1666,11 @@ public class VenueController {
         }
 
         if (fromYearComboBox != null) {
-            fromYearComboBox.setDisable(loading);
+            fromYearComboBox.setDisable(false);
         }
 
         if (toYearComboBox != null) {
-            toYearComboBox.setDisable(loading);
+            toYearComboBox.setDisable(false);
         }
 
         if (loadArticlesCheckBox != null) {

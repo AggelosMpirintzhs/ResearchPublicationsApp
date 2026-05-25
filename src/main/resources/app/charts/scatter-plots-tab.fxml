@@ -152,13 +152,10 @@
                 </VBox>
 
                 <VBox spacing="16"
-                      alignment="TOP_CENTER"
                       styleClass="dashboard-panel charts-dashboard"
-                      maxWidth="1250">
+                      maxWidth="1500">
 
-                    <HBox alignment="CENTER_LEFT"
-                          maxWidth="1150">
-
+                    <HBox alignment="CENTER_LEFT">
                         <VBox spacing="4" HBox.hgrow="ALWAYS">
                             <Label text="Articles / Year vs Avg Authors / Article"
                                    styleClass="content-title"/>
@@ -174,13 +171,11 @@
 
                     <VBox spacing="8"
                           styleClass="chart-card"
-                          prefWidth="1050"
-                          maxWidth="1050">
+                          maxWidth="1500">
 
                         <ScatterChart fx:id="venueScatterChart"
-                                      prefHeight="360"
-                                      minHeight="320"
-                                      maxHeight="380"
+                                      prefHeight="470"
+                                      minHeight="440"
                                       animated="false"
                                       legendVisible="false"
                                       horizontalGridLinesVisible="true"
@@ -192,14 +187,14 @@
                             <xAxis>
                                 <NumberAxis fx:id="scatterArticlesAxis"
                                             label="Articles / year"
-                                            forceZeroInRange="false"
+                                            forceZeroInRange="true"
                                             minorTickVisible="false"/>
                             </xAxis>
 
                             <yAxis>
                                 <NumberAxis fx:id="scatterAuthorsAxis"
                                             label="Avg authors / article"
-                                            forceZeroInRange="false"
+                                            forceZeroInRange="true"
                                             minorTickVisible="false"/>
                             </yAxis>
                         </ScatterChart>
@@ -210,8 +205,7 @@
                           styleClass="chart-card"
                           visible="false"
                           managed="false"
-                          prefWidth="1050"
-                          maxWidth="1050">
+                          maxWidth="1500">
 
                         <Label text="Legend"
                                styleClass="chart-card-title"/>
@@ -219,7 +213,7 @@
                         <FlowPane fx:id="venueScatterLegendFlow"
                                   hgap="10"
                                   vgap="8"
-                                  prefWrapLength="1050"/>
+                                  prefWrapLength="1200"/>
                     </VBox>
                 </VBox>
 
@@ -272,13 +266,10 @@
                 </VBox>
 
                 <VBox spacing="16"
-                      alignment="TOP_CENTER"
                       styleClass="dashboard-panel charts-dashboard"
-                      maxWidth="1250">
+                      maxWidth="1500">
 
-                    <HBox alignment="CENTER_LEFT"
-                          maxWidth="1150">
-
+                    <HBox alignment="CENTER_LEFT">
                         <VBox spacing="4" HBox.hgrow="ALWAYS">
                             <Label text="Journal Ranking Metrics Correlation"
                                    styleClass="content-title"/>
@@ -294,13 +285,11 @@
 
                     <VBox spacing="8"
                           styleClass="chart-card"
-                          prefWidth="1050"
-                          maxWidth="1050">
+                          maxWidth="1500">
 
                         <ScatterChart fx:id="journalRankingScatterChart"
-                                      prefHeight="370"
-                                      minHeight="330"
-                                      maxHeight="390"
+                                      prefHeight="500"
+                                      minHeight="460"
                                       animated="false"
                                       legendVisible="false"
                                       horizontalGridLinesVisible="true"
@@ -312,7 +301,7 @@
                             <xAxis>
                                 <NumberAxis fx:id="rankingXAxis"
                                             label="X metric"
-                                            forceZeroInRange="false"
+                                            forceZeroInRange="true"
                                             minorTickVisible="false"/>
                             </xAxis>
 

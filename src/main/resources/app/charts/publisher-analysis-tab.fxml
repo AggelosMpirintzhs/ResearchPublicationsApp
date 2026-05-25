@@ -40,7 +40,7 @@
                     <Label text="Publisher Analysis"
                            styleClass="venue-hero-title"/>
 
-                    <Label text="Search and compare up to 10 selected publishers through journal quartile distribution and total journal bar charts."
+                    <Label text="Search and compare up to 10 selected publishers through quartile distribution and total publication bar charts."
                            wrapText="true"
                            styleClass="venue-hero-subtitle"/>
                 </VBox>
@@ -135,17 +135,15 @@
                 </VBox>
 
                 <VBox spacing="16"
-                      alignment="TOP_CENTER"
                       styleClass="dashboard-panel charts-dashboard"
-                      maxWidth="1250">
+                      maxWidth="1500">
 
-                    <HBox alignment="CENTER_LEFT"
-                          maxWidth="1150">
+                    <HBox alignment="CENTER_LEFT">
                         <VBox spacing="4" HBox.hgrow="ALWAYS">
                             <Label text="Quartile Distribution"
                                    styleClass="content-title"/>
 
-                            <Label text="Each selected publisher is displayed on the X-axis. The four bar series correspond to Q1, Q2, Q3 and Q4 journal counts."
+                            <Label text="Each selected publisher is displayed on the X-axis. The four bar series correspond to Q1, Q2, Q3 and Q4 publication counts."
                                    wrapText="true"
                                    styleClass="stat-muted"/>
                         </VBox>
@@ -156,16 +154,14 @@
 
                     <VBox spacing="8"
                           styleClass="chart-card"
-                          prefWidth="1050"
-                          maxWidth="1050">
+                          maxWidth="1500">
 
-                        <Label text="Journal count per publisher and quartile"
+                        <Label text="Publication count per publisher and quartile"
                                styleClass="chart-card-title"/>
 
                         <BarChart fx:id="publisherQuartileBarChart"
-                                  prefHeight="380"
-                                  minHeight="340"
-                                  maxHeight="400"
+                                  prefHeight="560"
+                                  minHeight="520"
                                   animated="false"
                                   legendVisible="false"
                                   horizontalGridLinesVisible="true"
@@ -181,7 +177,7 @@
 
                             <yAxis>
                                 <NumberAxis fx:id="publisherCountAxis"
-                                            label="Journals count"
+                                            label="Publications count"
                                             forceZeroInRange="true"
                                             minorTickVisible="false"/>
                             </yAxis>
@@ -193,8 +189,7 @@
                           styleClass="chart-card"
                           visible="false"
                           managed="false"
-                          prefWidth="1050"
-                          maxWidth="1050">
+                          maxWidth="1500">
 
                         <Label text="Legend"
                                styleClass="chart-card-title"/>
@@ -202,22 +197,20 @@
                         <FlowPane fx:id="publisherLegendFlow"
                                   hgap="10"
                                   vgap="8"
-                                  prefWrapLength="1050"/>
+                                  prefWrapLength="1200"/>
                     </VBox>
                 </VBox>
 
                 <VBox fx:id="publisherTotalChartBox"
                       spacing="16"
-                      alignment="TOP_CENTER"
                       styleClass="dashboard-panel charts-dashboard"
                       visible="false"
                       managed="false"
-                      maxWidth="1250">
+                      maxWidth="1500">
 
-                    <HBox alignment="CENTER_LEFT"
-                          maxWidth="1150">
+                    <HBox alignment="CENTER_LEFT">
                         <VBox spacing="4" HBox.hgrow="ALWAYS">
-                            <Label text="Total Journals Comparison"
+                            <Label text="Total Publications Comparison"
                                    styleClass="content-title"/>
 
                             <Label text="This chart appears only when at least two publishers are selected."
@@ -231,16 +224,14 @@
 
                     <VBox spacing="8"
                           styleClass="chart-card"
-                          prefWidth="1050"
-                          maxWidth="1050">
+                          maxWidth="1500">
 
-                        <Label text="Total journals per publisher"
+                        <Label text="Total publications per publisher"
                                styleClass="chart-card-title"/>
 
                         <BarChart fx:id="publisherTotalBarChart"
-                                  prefHeight="360"
-                                  minHeight="320"
-                                  maxHeight="380"
+                                  prefHeight="460"
+                                  minHeight="420"
                                   animated="false"
                                   legendVisible="false"
                                   horizontalGridLinesVisible="true"
@@ -256,7 +247,7 @@
 
                             <yAxis>
                                 <NumberAxis fx:id="publisherTotalCountAxis"
-                                            label="Total journals"
+                                            label="Total publications"
                                             forceZeroInRange="true"
                                             minorTickVisible="false"/>
                             </yAxis>
@@ -268,8 +259,7 @@
                           styleClass="chart-card"
                           visible="false"
                           managed="false"
-                          prefWidth="1050"
-                          maxWidth="1050">
+                          maxWidth="1500">
 
                         <Label text="Legend"
                                styleClass="chart-card-title"/>
@@ -277,7 +267,7 @@
                         <FlowPane fx:id="publisherTotalLegendFlow"
                                   hgap="10"
                                   vgap="8"
-                                  prefWrapLength="1050"/>
+                                  prefWrapLength="1200"/>
                     </VBox>
                 </VBox>
             </VBox>
