@@ -50,6 +50,14 @@ source sql/project_database_dump.sql;
 ```
 This imports the generated TSV files into the MySQL database tables.
 
+Run the script with views:
+```sql
+source src/main/resources/views.sql;
+```
+and optionally the script with indexes for faster running:
+```sql
+source sql/project_indexes.sql;
+```
 ### 5. Configure the database connection
 
 Edit the file:
