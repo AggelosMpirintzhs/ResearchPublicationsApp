@@ -49,7 +49,8 @@ Run the loading script:
 source sql/project_database_dump.sql;
 ```
 This imports the generated TSV files into the MySQL database tables.
--Before running, update the paths according to your local MySQL installation .
+
+Before running, update the paths according to your local MySQL installation .
 
 Run the script with views:
 ```sql
